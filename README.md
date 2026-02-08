@@ -53,11 +53,19 @@ npm run preview
 
 ## GitHub Pages デプロイ
 
-### 1. GitHub Actions（推奨）
+### GitHub Actions（自動デプロイ）
 
-リポジトリの Settings > Pages で Source を **GitHub Actions** に設定し、Vite 用のワークフローを追加してください。
+`main` ブランチへの push で自動的にビルド・デプロイされます（`.github/workflows/deploy.yml`）。
 
-### 2. 手動デプロイ（gh-pages）
+**初回セットアップ:**
+
+1. GitHub リポジトリの Settings > Pages を開く
+2. Source を **GitHub Actions** に変更
+3. `main` に push すればデプロイが走ります
+
+### 手動デプロイ（gh-pages）
+
+GitHub Actions を使わない場合:
 
 ```bash
 npm install -D gh-pages
