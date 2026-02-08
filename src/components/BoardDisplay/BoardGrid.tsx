@@ -63,6 +63,20 @@ export function BoardGrid() {
           <span>パネルをクリックして選択</span>
         )}
       </div>
+      <div className="mt-4 pt-3 border-t border-gray-200 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-gray-500">
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-3 h-3 rounded bg-blue-500" />
+          A〜I: 景品
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-3 h-3 rounded bg-green-500" />
+          +: チャンス
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-3 h-3 rounded bg-red-600" />
+          -: シャッフル
+        </span>
+      </div>
     </div>
   );
 }
