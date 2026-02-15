@@ -13,7 +13,7 @@ export function BoardGrid() {
       if (state.selectedPalettePanel === null) return;
       dispatch({ type: "PLACE_PANEL", payload: { row, col } });
     },
-    [state.selectedPalettePanel, dispatch]
+    [state.selectedPalettePanel, dispatch],
   );
 
   useEffect(() => {
@@ -45,7 +45,7 @@ export function BoardGrid() {
   function handlePointerDown(
     event: React.PointerEvent<HTMLButtonElement>,
     row: number,
-    col: number
+    col: number,
   ) {
     if (!state.editMode) return;
     if (event.pointerType === "touch") return;
@@ -56,7 +56,7 @@ export function BoardGrid() {
   function handlePointerEnter(
     event: React.PointerEvent<HTMLButtonElement>,
     row: number,
-    col: number
+    col: number,
   ) {
     if (!state.editMode || !isDragging.current) return;
     if (event.pointerType === "touch") return;
@@ -65,7 +65,7 @@ export function BoardGrid() {
 
   const touchDrag = useTouchDrag(
     state.editMode ? state.selectedPalettePanel : null,
-    placePanel
+    placePanel,
   );
 
   return (
@@ -86,14 +86,24 @@ export function BoardGrid() {
               <PanelCell
                 key={panel.id}
                 panel={panel}
-                isSelected={!state.editMode && state.selectedPanel?.id === panel.id}
+                isSelected={
+                  !state.editMode && state.selectedPanel?.id === panel.id
+                }
                 isEditMode={state.editMode}
                 onClick={() => handlePanelClick(panel)}
                 onPointerDown={(event) =>
-                  handlePointerDown(event, panel.position.row, panel.position.col)
+                  handlePointerDown(
+                    event,
+                    panel.position.row,
+                    panel.position.col,
+                  )
                 }
                 onPointerEnter={(event) =>
-                  handlePointerEnter(event, panel.position.row, panel.position.col)
+                  handlePointerEnter(
+                    event,
+                    panel.position.row,
+                    panel.position.col,
+                  )
                 }
                 dataRow={panel.position.row}
                 dataCol={panel.position.col}

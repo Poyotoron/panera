@@ -18,7 +18,7 @@ function getCellFromTouch(touch: TouchPoint): CellPosition {
 
 export function useTouchDrag(
   selectedPanel: string | null,
-  onPlacePanel: (row: number, col: number) => void
+  onPlacePanel: (row: number, col: number) => void,
 ) {
   const [isDragging, setIsDragging] = useState(false);
   const touchedCellsRef = useRef<Set<string>>(new Set());
@@ -40,7 +40,7 @@ export function useTouchDrag(
       touchedCellsRef.current.add(key);
       onPlacePanel(cell.row, cell.col);
     },
-    [onPlacePanel, selectedPanel]
+    [onPlacePanel, selectedPanel],
   );
 
   const handleTouchMove = useCallback(
@@ -54,7 +54,7 @@ export function useTouchDrag(
       touchedCellsRef.current.add(key);
       onPlacePanel(cell.row, cell.col);
     },
-    [isDragging, onPlacePanel]
+    [isDragging, onPlacePanel],
   );
 
   const handleTouchEnd = useCallback(() => {

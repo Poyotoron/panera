@@ -37,7 +37,12 @@ export function appReducer(state: AppState, action: Action): AppState {
       const { row, col } = action.payload;
       return {
         ...state,
-        board: placePanelOnBoard(state.board, row, col, state.selectedPalettePanel),
+        board: placePanelOnBoard(
+          state.board,
+          row,
+          col,
+          state.selectedPalettePanel,
+        ),
       };
     }
 
@@ -102,7 +107,7 @@ export function appReducer(state: AppState, action: Action): AppState {
       const newBoard = swapPanels(
         state.board,
         panel1.position,
-        panel2.position
+        panel2.position,
       );
       return {
         ...state,

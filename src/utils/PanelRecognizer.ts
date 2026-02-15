@@ -93,7 +93,7 @@ export class PanelRecognizer {
 
   private extractCells(
     image: ImageData,
-    region: { x: number; y: number; width: number; height: number }
+    region: { x: number; y: number; width: number; height: number },
   ) {
     const { rows, cols } = this.gridSize;
     const cellWidth = region.width / cols;
@@ -115,7 +115,13 @@ export class PanelRecognizer {
     return cells;
   }
 
-  private extractRegion(source: ImageData, x: number, y: number, width: number, height: number): ImageData {
+  private extractRegion(
+    source: ImageData,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ): ImageData {
     const canvas = document.createElement("canvas");
     canvas.width = source.width;
     canvas.height = source.height;
@@ -166,7 +172,10 @@ export class PanelRecognizer {
         candidates.push({
           i,
           j,
-          distance: this.signatureDistance(cells[i].signature, cells[j].signature),
+          distance: this.signatureDistance(
+            cells[i].signature,
+            cells[j].signature,
+          ),
         });
       }
     }
@@ -283,7 +292,11 @@ export class PanelRecognizer {
     return { h, s, v };
   }
 
-  private resizeImage(imageData: ImageData, newWidth: number, newHeight: number): ImageData {
+  private resizeImage(
+    imageData: ImageData,
+    newWidth: number,
+    newHeight: number,
+  ): ImageData {
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
     if (!ctx) {

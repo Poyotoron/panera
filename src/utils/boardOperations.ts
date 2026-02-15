@@ -15,7 +15,7 @@ export function layoutToBoard(layout: string[][]): Panel[][] {
       type: labelToPanelType(label),
       label,
       position: { row: rowIndex, col: colIndex },
-    }))
+    })),
   );
 }
 
@@ -40,7 +40,7 @@ export function createEmptyBoard(difficulty: Difficulty): Panel[][] {
 export function swapPanels(
   board: Panel[][],
   p1: { row: number; col: number },
-  p2: { row: number; col: number }
+  p2: { row: number; col: number },
 ): Panel[][] {
   const newBoard = board.map((row) => row.map((panel) => ({ ...panel })));
 
@@ -66,7 +66,7 @@ export function placePanelOnBoard(
   board: Panel[][],
   row: number,
   col: number,
-  label: string
+  label: string,
 ): Panel[][] {
   const newBoard = board.map((r) => r.map((p) => ({ ...p })));
   newBoard[row][col] = {
@@ -79,7 +79,7 @@ export function placePanelOnBoard(
 
 export function applyDetectedPanels(
   difficulty: Difficulty,
-  detectedPanels: DetectedPanel[]
+  detectedPanels: DetectedPanel[],
 ): Panel[][] {
   const board = createEmptyBoard(difficulty);
   for (const detected of detectedPanels) {
