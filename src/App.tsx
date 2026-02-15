@@ -3,6 +3,7 @@ import { AppProvider, useAppContext } from "./context/AppContext";
 import { Header } from "./components/Header";
 import { DifficultyTabs } from "./components/DifficultyTabs";
 import { PanelPalette } from "./components/PanelPalette";
+import { ImageRecognitionPanel } from "./components/ImageRecognitionPanel";
 import { BoardGrid } from "./components/BoardDisplay/BoardGrid";
 import { ActionButtons } from "./components/ActionButtons";
 import { HistoryPanel } from "./components/HistoryPanel";
@@ -25,7 +26,17 @@ function AppContent() {
       <Header />
       <main className="container mx-auto px-4 py-6 max-w-2xl space-y-4">
         <DifficultyTabs />
-        {state.editMode && <PanelPalette />}
+        {state.editMode && (
+          <>
+            <PanelPalette />
+            <ImageRecognitionPanel
+              difficulty={state.difficulty}
+              onRecognitionComplete={(panels) =>
+                dispatch({ type: "APPLY_RECOGNITION", payload: panels })
+              }
+            />
+          </>
+        )}
         <BoardGrid />
         <ActionButtons />
         {!state.editMode && <HistoryPanel />}

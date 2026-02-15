@@ -1,3 +1,4 @@
+import type React from "react";
 import type { Panel } from "../../types";
 import { getPanelClasses } from "../../styles/panelStyles";
 
@@ -6,8 +7,10 @@ interface PanelCellProps {
   isSelected: boolean;
   isEditMode: boolean;
   onClick: () => void;
-  onPointerDown?: () => void;
-  onPointerEnter?: () => void;
+  onPointerDown?: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onPointerEnter?: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  dataRow?: number;
+  dataCol?: number;
 }
 
 export function PanelCell({
@@ -17,12 +20,16 @@ export function PanelCell({
   onClick,
   onPointerDown,
   onPointerEnter,
+  dataRow,
+  dataCol,
 }: PanelCellProps) {
   return (
     <button
       onClick={onClick}
       onPointerDown={onPointerDown}
       onPointerEnter={onPointerEnter}
+      data-row={dataRow}
+      data-col={dataCol}
       aria-label={`パネル ${panel.label || "空"} (${panel.position.row}, ${panel.position.col})`}
       aria-pressed={isSelected}
       className={getPanelClasses(panel.type, isSelected, isEditMode)}

@@ -1,4 +1,4 @@
-import type { Difficulty, Panel, PanelType } from "../types";
+import type { DetectedPanel, Difficulty, Panel, PanelType } from "../types";
 import { DIFFICULTY_CONFIG } from "../data/difficultyConfig";
 
 export function labelToPanelType(label: string): PanelType {
@@ -75,4 +75,21 @@ export function placePanelOnBoard(
     type: labelToPanelType(label),
   };
   return newBoard;
+}
+
+export function applyDetectedPanels(
+  difficulty: Difficulty,
+  detectedPanels: DetectedPanel[]
+): Panel[][] {
+  const board = createEmptyBoard(difficulty);
+  for (const detected of detectedPanels) {
+    const { row, col } = detected.position;
+    if (!board[row] || !board[row][col]) continue;
+    board[row][col] = {
+      ...board[row][col],
+      label: detected.label,
+      type: labelToPanelType(detected.label),
+    };
+  }
+  return board;
 }
