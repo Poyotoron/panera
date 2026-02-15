@@ -230,13 +230,13 @@ interface SwapOperation {
 │           panera - Lucky Panel Solver       │
 ├─────────────────────────────────────────────┤
 │                                             │
-│  [甘口] [中辛] [辛口]  ← タブ切り替え         │
+│  [甘口] [中辛] [辛口] [激辛]  ← タブ切り替え │
 │                                             │
 │  ┌─────────────────────────────────────┐   │
-│  │ 初期パターン選択:                      │   │
-│  │ [パターン1] [パターン2] [パターン3] ... │   │
-│  │                                       │   │
-│  │ [カスタム編集モード]                   │   │
+│  │ パネル選択パレット:                    │   │
+│  │ [A] [B] [C] [D] [E] [F] [G] ...      │   │
+│  │ [+] [-] [消去]                        │   │
+│  │ 選択中: [B]                           │   │
 │  └─────────────────────────────────────┘   │
 │                                             │
 │  ┌─────────────────────────────────────┐   │
@@ -246,10 +246,13 @@ interface SwapOperation {
 │  │    [B] [B] [D] [E]                   │   │
 │  │    [C] [C] [D] [E]                   │   │
 │  │                                       │   │
-│  │  選択中: なし                          │   │
 │  └─────────────────────────────────────┘   │
 │                                             │
-│  [初期化] [履歴をクリア]                    │
+│  ＜編集モード時＞                            │
+│  [盤面をクリア] [編集完了]                  │
+│                                             │
+│  ＜入れ替えモード時＞                        │
+│  [盤面を再編集] [初期化] [履歴をクリア]      │
 │                                             │
 │  ┌─────────────────────────────────────┐   │
 │  │ 操作履歴:                              │   │
@@ -260,6 +263,8 @@ interface SwapOperation {
 │                                             │
 └─────────────────────────────────────────────┘
 ```
+
+**Note（2/15更新）:** 初期パターン選択機能は削除し、パレット方式のエディット機能に統一しました。
 
 ### 4.2 パネル表示仕様
 ```typescript
@@ -290,11 +295,49 @@ const PANEL_STYLES = {
 
 ### 4.3 インタラクション仕様
 
-#### パネル選択と入れ替え
+#### モードの切り替え
+```
+起動時 / 難易度変更時:
+  → 編集モードで開始
+  
+編集モード:
+  - パレットとグリッドが操作可能
+  - [編集完了]で入れ替えモードへ
+  
+入れ替えモード:
+  - グリッドのみ操作可能（パネル入れ替え）
+  - [盤面を再編集]で編集モードへ戻る
+```
+
+#### 編集モードの操作
+```
+1. パレットからパネルを選択（例: "B"をクリック）
+   → パレット上でハイライト表示
+   → 「選択中: B」と表示
+
+2. 盤面グリッド上のマスをクリック
+   → 選択中のパネル（B）がそのマスに配置される
+   → パレットの選択は維持される（連続配置可能）
+
+3. 別のパネルを選択（例: "+"をクリック）
+   → 選択が切り替わる
+
+4. 配置を続ける
+   → 盤面全体を設定
+
+5. [盤面をクリア]をクリック（必要に応じて）
+   → 全マスが空になる
+
+6. [編集完了]をクリック
+   → 現在の盤面が初期状態として保存される
+   → 入れ替えモードに切り替わる
+```
+
+#### 入れ替えモードの操作
 ```
 1. ユーザーが1つ目のパネルをクリック
    → パネルにハイライト表示（selected状態）
-   → 「選択中: A(0,0)」と表示
+   → 「選択中: A(0,0)」と表示（履歴パネル下部など）
 
 2. ユーザーが2つ目のパネルをクリック
    → 2つのパネルの位置を入れ替え
@@ -308,18 +351,18 @@ const PANEL_STYLES = {
 
 #### 初期化動作
 ```
-[初期化]ボタンをクリック
+[初期化]ボタンをクリック（入れ替えモード時のみ表示）
   → 確認ダイアログ表示: "盤面を初期状態に戻しますか？"
-  → OK: 選択中のパターンの初期状態に戻す
+  → OK: 編集完了時に保存した初期盤面に戻す
   → Cancel: 何もしない
 ```
 
-#### カスタム編集モード
+#### 盤面再編集
 ```
-[カスタム編集モード]をONにすると:
-  - 各パネルをクリックで種類を変更可能
-  - A → B → C → ... → + → - → A の順で循環
-  - 編集完了後は通常モードに戻して使用
+[盤面を再編集]ボタンをクリック（入れ替えモード時のみ表示）
+  → 確認ダイアログ表示: "盤面を再編集しますか？（履歴はクリアされます）"
+  → OK: 編集モードに切り替え、履歴をクリア
+  → Cancel: 何もしない
 ```
 
 ---
@@ -329,24 +372,37 @@ const PANEL_STYLES = {
 ### 5.1 Core Features
 
 #### F1: 難易度タブ切り替え
-- **要件**: ユーザーは甘口/中辛/辛口の3つの難易度を切り替え可能
-- **動作**: タブをクリックすると該当難易度の初期パターン選択ボタンが表示される
-- **状態管理**: 難易度切り替え時は盤面をリセット
+- **要件**: ユーザーは甘口/中辛/辛口/激辛の4つの難易度を切り替え可能
+- **動作**: タブをクリックすると該当難易度の空の盤面が表示される
+- **状態管理**: 難易度切り替え時は編集モードで開始
 
-#### F2: 初期パターン選択
-- **要件**: 各難易度ごとの初期パターンをボタンで選択可能
-- **動作**: パターンボタンをクリックすると盤面に該当パターンが読み込まれる
-- **視覚的フィードバック**: 選択中のパターンはボタンの色が変わる
+#### F2: パレット選択機能（2/15追加）
+- **要件**: パレットから任意のパネル種類を選択可能
+- **動作**: 
+  - 景品パネル（A-K、難易度により異なる）
+  - チャンスパネル（+）
+  - シャッフルパネル（-）
+  - 消去（マスを空にする）
+- **視覚的フィードバック**: 選択中のパネルはハイライト表示
 
-#### F3: パネル入れ替え操作
+#### F3: 盤面配置機能（2/15追加）
+- **要件**: 選択したパネルを盤面グリッド上に配置可能
+- **動作**:
+  1. パレットからパネルを選択
+  2. グリッド上のマスをクリック
+  3. 選択したパネルが配置される
+  4. パレット選択は維持され、連続配置可能
+- **制約**: 編集モード時のみ有効
+
+#### F4: パネル入れ替え操作
 - **要件**: 盤面上の任意の2つのパネルを選択して入れ替え可能
 - **動作**:
   1. 1つ目のパネルクリック → 選択状態になる
   2. 2つ目のパネルクリック → 2つのパネルが入れ替わる
   3. アニメーション効果で入れ替えを視覚化
-- **制約**: なし（どのパネル同士でも入れ替え可能）
+- **制約**: 入れ替えモード時のみ有効
 
-#### F4: 操作履歴表示
+#### F5: 操作履歴表示
 - **要件**: 実行した入れ替え操作の履歴を時系列で表示
 - **表示内容**:
   - 操作番号
@@ -354,36 +410,55 @@ const PANEL_STYLES = {
   - タイムスタンプ
 - **機能**: [履歴をクリア]ボタンで履歴を削除可能
 
-#### F5: 初期化機能
-- **要件**: 盤面を選択中の初期パターン状態に戻す
+#### F6: 初期化機能
+- **要件**: 盤面を編集完了時の初期状態に戻す
 - **動作**:
   - 確認ダイアログを表示
   - OK時: 盤面、選択状態、履歴をリセット
-- **制約**: 初期パターンが選択されていない場合はボタンが無効
+- **制約**: 入れ替えモード時のみ有効
+
+#### F7: モード切り替え機能（2/15追加）
+- **要件**: 編集モードと入れ替えモードを切り替え可能
+- **動作**:
+  - 編集モード: [編集完了]で入れ替えモードへ
+  - 入れ替えモード: [盤面を再編集]で編集モードへ
+- **状態管理**: モード切り替え時に適切な確認ダイアログを表示
 
 ### 5.2 Advanced Features
 
-#### F6: カスタム編集モード
-- **要件**: ユーザーが独自の盤面パターンを作成可能
-- **動作**:
-  - トグルスイッチでモードON/OFF
-  - ONの間はパネルクリックで種類を変更
-  - 景品パネルは最大9種類まで（A-I）
-- **保存**: 編集した盤面はlocalStorageに保存（任意）
+#### F8: 盤面クリア機能（2/15追加）
+- **要件**: 盤面全体を一括でクリア可能
+- **動作**: [盤面をクリア]ボタンで全マスを空にする
+- **制約**: 編集モード時のみ有効
 
-#### F7: レスポンシブデザイン
+#### F9: localStorage永続化（2/15追加）
+- **要件**: 編集した初期盤面を自動保存
+- **動作**:
+  - 編集完了時にlocalStorageに保存
+  - 次回起動時に同じ難易度なら復元
+  - 難易度が異なる場合は空の盤面から開始
+- **データ**: 盤面配列と難易度を保存
+
+#### F10: レスポンシブデザイン
 - **要件**: スマートフォン、タブレット、デスクトップで適切に表示
 - **ブレークポイント**:
-  - Mobile: < 640px
+  - Mobile: < 640px（パネルサイズを動的調整）
   - Tablet: 640px - 1024px
   - Desktop: > 1024px
+- **特殊対応**: 激辛（4×6）はモバイルでパネルサイズを縮小
 
-#### F8: キーボードショートカット
-- **要件**: キーボードでも操作可能（オプション）
-- **ショートカット**:
-  - `R`: 初期化（Reset）
-  - `E`: 編集モード切り替え（Edit）
-  - `H`: 履歴クリア（History clear）
+#### F11: キーボードショートカット（オプション）
+- **要件**: キーボードでも操作可能
+- **編集モード**:
+  - `A-K`: 対応する景品パネルを選択
+  - `+`: チャンスパネルを選択
+  - `-`: シャッフルパネルを選択
+  - `Delete`/`Backspace`: 消去モードを選択
+  - `Enter`: 編集完了
+- **入れ替えモード**:
+  - `E`: 編集モードに切り替え
+  - `R`: 初期化
+  - `H`: 履歴クリア
   - `Tab`: パネル間移動
   - `Enter`: パネル選択
 
@@ -455,20 +530,28 @@ App
 ├── Header
 │   └── Title
 ├── DifficultyTabs
-│   └── TabButton (×3)
-├── PatternSelector
-│   ├── PatternButton (×n)
-│   └── CustomEditToggle
+│   └── TabButton (×4: 甘口/中辛/辛口/激辛)
+├── PanelPalette (編集モード時のみ表示)
+│   ├── PrizeButtons (A-K)
+│   ├── SpecialButtons (+/-)
+│   └── EraseButton
 ├── BoardDisplay
 │   ├── BoardGrid
 │   │   └── PanelCell (×n)
-│   └── SelectionIndicator
-├── ActionButtons
-│   ├── ResetButton
-│   └── ClearHistoryButton
-└── HistoryPanel
+│   └── ModeIndicator (編集中 or 入れ替え中)
+├── ActionButtons (モードにより表示内容が変わる)
+│   ├── EditModeButtons
+│   │   ├── ClearBoardButton
+│   │   └── FinishEditingButton
+│   └── SwapModeButtons
+│       ├── ReEditButton
+│       ├── ResetButton
+│       └── ClearHistoryButton
+└── HistoryPanel (入れ替えモード時のみ表示)
     └── HistoryItem (×n)
 ```
+
+**Note（2/15更新）:** PatternSelectorコンポーネントは削除し、PanelPaletteとモード切り替え機能を追加しました。
 
 ### 7.2 主要コンポーネント仕様
 
@@ -476,9 +559,18 @@ App
 ```typescript
 // メインアプリケーションコンポーネント
 // Context Providerでグローバル状態を管理
+// 編集モードと入れ替えモードの切り替えを制御
 
 const App: React.FC = () => {
   const [state, dispatch] = useReducer(boardReducer, initialState);
+  
+  // 起動時にlocalStorageから復元
+  useEffect(() => {
+    const savedBoard = loadInitialBoard(state.difficulty);
+    if (savedBoard) {
+      dispatch({ type: 'LOAD_SAVED_BOARD', payload: savedBoard });
+    }
+  }, []);
   
   return (
     <AppContext.Provider value={{ state, dispatch }}>
@@ -486,10 +578,17 @@ const App: React.FC = () => {
         <Header />
         <main className="container mx-auto px-4 py-8">
           <DifficultyTabs />
-          <PatternSelector />
+          
+          {/* 編集モード時のみパレット表示 */}
+          {state.editMode && <PanelPalette />}
+          
           <BoardDisplay />
+          
+          {/* モードにより表示内容が変わる */}
           <ActionButtons />
-          <HistoryPanel />
+          
+          {/* 入れ替えモード時のみ履歴表示 */}
+          {!state.editMode && <HistoryPanel />}
         </main>
       </div>
     </AppContext.Provider>
@@ -500,19 +599,38 @@ const App: React.FC = () => {
 #### BoardGrid.tsx
 ```typescript
 // 盤面グリッドを表示するコンポーネント
-// レスポンシブでタッチ/クリック両対応
+// モードにより動作が変わる
 
 interface BoardGridProps {
   board: Panel[][];
-  onPanelClick: (panel: Panel) => void;
+  editMode: boolean;
+  selectedPalettePanel: string | null;
   selectedPanels: [Panel | null, Panel | null];
+  onPanelClick: (panel: Panel) => void;
 }
 
 const BoardGrid: React.FC<BoardGridProps> = ({
   board,
-  onPanelClick,
-  selectedPanels
+  editMode,
+  selectedPalettePanel,
+  selectedPanels,
+  onPanelClick
 }) => {
+  const getPanelSize = () => {
+    const cols = board[0]?.length || 4;
+    const isMobile = window.innerWidth < 640;
+    
+    if (!isMobile) return 'w-16 h-16';
+    
+    // モバイル時は列数に応じてサイズ調整
+    switch (cols) {
+      case 4: return 'w-16 h-16';
+      case 5: return 'w-12 h-12';
+      case 6: return 'w-10 h-10';  // 激辛
+      default: return 'w-14 h-14';
+    }
+  };
+  
   return (
     <div className="grid gap-2 w-fit mx-auto">
       {board.map((row, rowIndex) => (
@@ -521,15 +639,25 @@ const BoardGrid: React.FC<BoardGridProps> = ({
             <PanelCell
               key={`${rowIndex}-${colIndex}`}
               panel={panel}
+              size={getPanelSize()}
               isSelected={
-                selectedPanels[0]?.id === panel.id ||
-                selectedPanels[1]?.id === panel.id
+                editMode 
+                  ? false  // 編集モードでは選択状態なし
+                  : selectedPanels[0]?.id === panel.id ||
+                    selectedPanels[1]?.id === panel.id
               }
+              isEditMode={editMode}
               onClick={() => onPanelClick(panel)}
             />
           ))}
         </div>
       ))}
+      
+      {editMode && (
+        <p className="text-center mt-2 text-sm text-gray-600">
+          パレットから選択: {selectedPalettePanel || 'なし'}
+        </p>
+      )}
     </div>
   );
 };
@@ -538,38 +666,126 @@ const BoardGrid: React.FC<BoardGridProps> = ({
 #### PanelCell.tsx
 ```typescript
 // 個別のパネルセルコンポーネント
-// アニメーション、スタイリング、インタラクションを管理
+// モードにより表示スタイルが変わる
 
 interface PanelCellProps {
   panel: Panel;
+  size: string;
   isSelected: boolean;
+  isEditMode: boolean;
   onClick: () => void;
 }
 
 const PanelCell: React.FC<PanelCellProps> = ({
   panel,
+  size,
   isSelected,
+  isEditMode,
   onClick
 }) => {
   const styles = PANEL_STYLES[panel.type];
+  
+  // 空のマス（編集モード用）
+  if (!panel.label) {
+    return (
+      <button
+        onClick={onClick}
+        className={`
+          ${size} rounded-lg text-2xl font-bold
+          border-2 border-dashed border-gray-400
+          bg-gray-100
+          ${isEditMode ? 'hover:bg-gray-200 cursor-pointer' : 'cursor-not-allowed'}
+          transition-all duration-200
+        `}
+        disabled={!isEditMode}
+      >
+        　
+      </button>
+    );
+  }
   
   return (
     <button
       onClick={onClick}
       className={`
-        w-16 h-16 rounded-lg text-2xl font-bold
+        ${size} rounded-lg text-2xl font-bold
         transition-all duration-200
         ${styles.background}
         ${styles.hover}
         ${styles.text}
-        ${isSelected ? styles.selected : ""}
-        ${panel.type === "shuffle" ? styles.pulse : ""}
-        ${panel.type === "chance" ? styles.glow : ""}
-        active:scale-95
+        ${isSelected ? styles.selected : ''}
+        ${panel.type === 'shuffle' ? styles.pulse : ''}
+        ${panel.type === 'chance' ? styles.glow : ''}
+        ${isEditMode ? 'cursor-pointer' : 'active:scale-95'}
       `}
     >
       {panel.label}
     </button>
+  );
+};
+```
+
+#### ActionButtons.tsx
+```typescript
+// モードにより表示するボタンが変わる
+
+interface ActionButtonsProps {
+  editMode: boolean;
+  onClearBoard: () => void;
+  onFinishEditing: () => void;
+  onReEdit: () => void;
+  onReset: () => void;
+  onClearHistory: () => void;
+}
+
+const ActionButtons: React.FC<ActionButtonsProps> = ({
+  editMode,
+  onClearBoard,
+  onFinishEditing,
+  onReEdit,
+  onReset,
+  onClearHistory
+}) => {
+  if (editMode) {
+    return (
+      <div className="flex gap-4 justify-center my-4">
+        <button
+          onClick={onClearBoard}
+          className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+        >
+          盤面をクリア
+        </button>
+        <button
+          onClick={onFinishEditing}
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+        >
+          編集完了
+        </button>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="flex gap-4 justify-center my-4">
+      <button
+        onClick={onReEdit}
+        className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+      >
+        盤面を再編集
+      </button>
+      <button
+        onClick={onReset}
+        className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+      >
+        初期化
+      </button>
+      <button
+        onClick={onClearHistory}
+        className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+      >
+        履歴をクリア
+      </button>
+    </div>
   );
 };
 ```
@@ -977,7 +1193,444 @@ MIT License - see [LICENSE](LICENSE) file for details
 
 ---
 
-## 18. ライセンス
+## 18. 2/15追加分：激辛難易度と盤面入力の改善
+
+### 18.1 激辛難易度の追加
+
+#### 盤面サイズと景品数
+```
+激辛（Expert）:
+  - 盤面サイズ: 4行 × 6列 = 24マス
+  - 景品数: 11個（A-K）
+  - チャンスパネル: 1個（+）
+  - シャッフルパネル: 1個（-）
+  - 合計: 11種類の景品 + チャンス + シャッフル = 13パネル種類
+```
+
+#### データ構造の拡張
+```typescript
+// 難易度定義の更新
+const DIFFICULTY_CONFIG = {
+  easy: { rows: 3, cols: 4, prizes: 5 },
+  medium: { rows: 4, cols: 4, prizes: 7 },
+  hard: { rows: 4, cols: 5, prizes: 9 },
+  expert: { rows: 4, cols: 6, prizes: 11 }  // NEW
+};
+
+// 景品ラベルの拡張
+const PRIZE_LABELS = {
+  easy: ['A', 'B', 'C', 'D', 'E'],
+  medium: ['A', 'B', 'C', 'D', 'E', 'F', 'G'],
+  hard: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'],
+  expert: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']  // NEW
+};
+```
+
+#### UI更新
+```
+難易度タブに「激辛」を追加:
+[甘口] [中辛] [辛口] [激辛]
+
+激辛選択時:
+- 4×6のグリッド表示（24マス）
+- 11種類の景品パネル（A-K）
+```
+
+### 18.2 初期パターン選択機能の削除
+
+**変更理由:**
+- 初期盤面のパターンが多様で全てを網羅することが困難
+- ユーザーが実際のゲーム画面を見ながら自由に盤面を設定できる方が実用的
+
+**削除する機能:**
+- 初期パターン選択ボタン群
+- `INITIAL_PATTERNS`定数
+- `PatternSelector`コンポーネント
+
+**変更後のワークフロー:**
+1. 難易度タブを選択
+2. 盤面エディット機能で初期状態を設定
+3. パネル入れ替え操作をトレース
+4. 必要に応じて初期化ボタンで最初の設定状態に戻す
+
+### 18.3 盤面エディット機能の充実
+
+#### 課題
+従来の「1クリックで1種類ずつ循環」方式では、景品数が11個まで増えると：
+- A → B → C → ... → K → + → - → A と13回クリックが必要
+- 盤面全体（24マス）を設定するのに時間がかかる
+
+#### 解決策：クイック入力パレット方式
+
+**新しいUI設計:**
+
+```
+┌─────────────────────────────────────────────┐
+│  [甘口] [中辛] [辛口] [激辛]                │
+├─────────────────────────────────────────────┤
+│                                             │
+│  パネル選択パレット:                         │
+│  [A] [B] [C] [D] [E] [F] [G] [H] [I] [J] [K]│
+│  [+] [-] [消去]                             │
+│                                             │
+│  選択中: [B] ← ハイライト表示                │
+│                                             │
+│  ┌─────────────────────────────────────┐   │
+│  │         盤面（グリッド表示）            │   │
+│  │                                       │   │
+│  │  [A] [A] [B] [B] [C] [C]             │   │
+│  │  [D] [D] [E] [E] [F] [F]             │   │
+│  │  [G] [G] [H] [H] [I] [I]             │   │
+│  │  [J] [J] [K] [K] [+] [-]             │   │
+│  │                                       │   │
+│  └─────────────────────────────────────┘   │
+│                                             │
+│  [盤面をクリア] [編集完了]                   │
+│                                             │
+└─────────────────────────────────────────────┘
+```
+
+#### 操作フロー
+
+**盤面設定モード（初回起動時 / 難易度切り替え時）:**
+```
+1. パレットからパネル種類を選択（例: "B"をクリック）
+   → 選択中のパネルがハイライト表示
+
+2. 盤面グリッド上のマスをクリック
+   → 選択中のパネル（B）が配置される
+   → パレットの選択は維持される（連続配置可能）
+
+3. 別のパネルを選択（例: "+"をクリック）
+   → 選択が切り替わる
+
+4. 盤面に配置
+   → 繰り返し
+
+5. [編集完了]ボタンをクリック
+   → 入れ替えモードに切り替わる
+```
+
+**入れ替えモード（通常の使用）:**
+```
+1. 盤面上のパネルを2つ選択して入れ替え
+   → 従来通りの操作
+
+2. [盤面を再編集]ボタンで盤面設定モードに戻る
+   → パレットが表示され、再度盤面を編集可能
+```
+
+#### コンポーネント設計
+
+**新規コンポーネント: PanelPalette.tsx**
+```typescript
+interface PanelPaletteProps {
+  difficulty: "easy" | "medium" | "hard" | "expert";
+  selectedPanel: string | null;
+  onPanelSelect: (panel: string) => void;
+}
+
+const PanelPalette: React.FC<PanelPaletteProps> = ({
+  difficulty,
+  selectedPanel,
+  onPanelSelect
+}) => {
+  const prizes = PRIZE_LABELS[difficulty];
+  const specialPanels = ['+', '-', '消去'];
+  
+  return (
+    <div className="mb-4">
+      <h3 className="text-sm font-semibold mb-2">パネル選択パレット:</h3>
+      
+      {/* 景品パネル */}
+      <div className="flex flex-wrap gap-2 mb-2">
+        {prizes.map(label => (
+          <button
+            key={label}
+            onClick={() => onPanelSelect(label)}
+            className={`
+              w-12 h-12 rounded font-bold
+              ${selectedPanel === label 
+                ? 'bg-blue-600 text-white ring-4 ring-blue-300' 
+                : 'bg-blue-500 text-white hover:bg-blue-600'
+              }
+            `}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      
+      {/* 特殊パネル */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => onPanelSelect('+')}
+          className={`
+            w-12 h-12 rounded font-bold
+            ${selectedPanel === '+' 
+              ? 'bg-green-600 text-white ring-4 ring-green-300' 
+              : 'bg-green-500 text-white hover:bg-green-600'
+            }
+          `}
+        >
+          +
+        </button>
+        <button
+          onClick={() => onPanelSelect('-')}
+          className={`
+            w-12 h-12 rounded font-bold
+            ${selectedPanel === '-' 
+              ? 'bg-red-700 text-white ring-4 ring-red-300' 
+              : 'bg-red-600 text-white hover:bg-red-700'
+            }
+          `}
+        >
+          -
+        </button>
+        <button
+          onClick={() => onPanelSelect('')}
+          className={`
+            px-4 h-12 rounded font-bold
+            ${selectedPanel === '' 
+              ? 'bg-gray-600 text-white ring-4 ring-gray-300' 
+              : 'bg-gray-500 text-white hover:bg-gray-600'
+            }
+          `}
+        >
+          消去
+        </button>
+      </div>
+      
+      {selectedPanel && (
+        <p className="mt-2 text-sm">
+          選択中: <span className="font-bold">{selectedPanel || '消去'}</span>
+        </p>
+      )}
+    </div>
+  );
+};
+```
+
+#### 状態管理の更新
+
+```typescript
+interface AppState {
+  difficulty: "easy" | "medium" | "hard" | "expert";  // expertを追加
+  board: Panel[][];
+  selectedPanels: [Panel | null, Panel | null];
+  history: SwapOperation[];
+  
+  // 新規追加
+  editMode: boolean;              // 編集モード or 入れ替えモード
+  selectedPalettePanel: string | null;  // パレットで選択中のパネル
+  initialBoard: Panel[][] | null; // 編集完了時の盤面を保存（初期化用）
+}
+
+type Action =
+  | { type: "SET_DIFFICULTY"; payload: "easy" | "medium" | "hard" | "expert" }
+  | { type: "SELECT_PALETTE_PANEL"; payload: string }
+  | { type: "PLACE_PANEL"; payload: { row: number; col: number } }
+  | { type: "TOGGLE_EDIT_MODE" }
+  | { type: "FINISH_EDITING" }  // 編集完了時に初期盤面を保存
+  | { type: "CLEAR_BOARD" }
+  | { type: "SELECT_PANEL"; payload: Panel }
+  | { type: "SWAP_PANELS"; payload: [Panel, Panel] }
+  | { type: "RESET_BOARD" }  // 保存した初期盤面に戻す
+  | { type: "CLEAR_HISTORY" };
+```
+
+#### モード切り替えロジック
+
+```typescript
+// 編集モードでの盤面クリック
+const handleBoardClickInEditMode = (row: number, col: number) => {
+  if (!selectedPalettePanel) {
+    alert('パレットからパネルを選択してください');
+    return;
+  }
+  
+  dispatch({
+    type: 'PLACE_PANEL',
+    payload: { row, col }
+  });
+};
+
+// 入れ替えモードでの盤面クリック
+const handleBoardClickInSwapMode = (panel: Panel) => {
+  dispatch({
+    type: 'SELECT_PANEL',
+    payload: panel
+  });
+};
+
+// 現在のモードに応じて適切なハンドラを使用
+const handleBoardClick = (panel: Panel) => {
+  if (state.editMode) {
+    handleBoardClickInEditMode(panel.position.row, panel.position.col);
+  } else {
+    handleBoardClickInSwapMode(panel);
+  }
+};
+```
+
+#### ボタンの配置
+
+**編集モード時:**
+```
+[盤面をクリア] [編集完了]
+```
+
+**入れ替えモード時:**
+```
+[盤面を再編集] [初期化] [履歴をクリア]
+```
+
+#### キーボードショートカット（オプション）
+
+```
+編集モード:
+- A-K: 対応する景品パネルを選択
+- +: チャンスパネルを選択
+- -: シャッフルパネルを選択
+- Delete/Backspace: 消去モードを選択
+- Enter: 編集完了
+
+入れ替えモード:
+- E: 編集モードに切り替え
+- R: 初期化
+- H: 履歴クリア
+```
+
+### 18.4 レスポンシブ対応の調整
+
+激辛難易度（4×6グリッド）はモバイルで横幅が厳しいため：
+
+```typescript
+// パネルサイズの動的調整
+const getPanelSize = (difficulty: string, screenWidth: number) => {
+  if (screenWidth < 640) {  // Mobile
+    switch (difficulty) {
+      case 'easy': return 'w-16 h-16';      // 3×4
+      case 'medium': return 'w-14 h-14';    // 4×4
+      case 'hard': return 'w-12 h-12';      // 4×5
+      case 'expert': return 'w-10 h-10';    // 4×6
+    }
+  }
+  return 'w-16 h-16';  // Desktop: 全て同じサイズ
+};
+```
+
+### 18.5 データ永続化の改善
+
+編集した盤面をlocalStorageに自動保存：
+
+```typescript
+// 編集完了時に保存
+const saveInitialBoard = (board: Panel[][]) => {
+  localStorage.setItem('panera_initial_board', JSON.stringify(board));
+  localStorage.setItem('panera_difficulty', state.difficulty);
+};
+
+// 起動時に復元
+const loadInitialBoard = (): Panel[][] | null => {
+  const saved = localStorage.getItem('panera_initial_board');
+  const savedDifficulty = localStorage.getItem('panera_difficulty');
+  
+  if (saved && savedDifficulty === state.difficulty) {
+    return JSON.parse(saved);
+  }
+  return null;
+};
+```
+
+### 18.6 更新されたファイル構造
+
+```
+panera/
+├── src/
+│   ├── components/
+│   │   ├── Header.tsx
+│   │   ├── DifficultyTabs.tsx
+│   │   ├── PanelPalette.tsx          // NEW: パレット選択UI
+│   │   ├── BoardDisplay/
+│   │   │   ├── BoardGrid.tsx
+│   │   │   ├── PanelCell.tsx
+│   │   │   └── SelectionIndicator.tsx
+│   │   ├── ActionButtons.tsx         // UPDATED: モード切り替え対応
+│   │   └── HistoryPanel.tsx
+│   ├── data/
+│   │   └── difficultyConfig.ts       // UPDATED: 激辛追加
+│   ├── utils/
+│   │   ├── boardOperations.ts
+│   │   └── localStorage.ts            // NEW: 永続化ユーティリティ
+```
+
+### 18.7 実装フェーズの更新
+
+**Phase 1: 基本UI構築（2-3時間）**
+```
+□ プロジェクトセットアップ
+□ 難易度タブ（激辛を含む4つ）
+□ PanelPaletteコンポーネント
+□ 盤面グリッドの表示（動的サイズ対応）
+□ モード切り替えUI
+```
+
+**Phase 2: エディット機能（3-4時間）**
+```
+□ パレット選択ロジック
+□ 盤面への配置ロジック
+□ 編集モードと入れ替えモードの切り替え
+□ 初期盤面の保存と復元
+□ localStorage連携
+```
+
+**Phase 3: 入れ替え機能（2-3時間）**
+```
+□ パネル選択ロジック（入れ替えモード）
+□ 入れ替えアニメーション
+□ 操作履歴の記録
+□ 初期化機能
+```
+
+**Phase 4: UX改善とテスト（2-3時間）**
+```
+□ レスポンシブデザイン（特に激辛のモバイル対応）
+□ キーボードショートカット
+□ エラーハンドリング
+□ ユーザビリティテスト
+```
+
+**Phase 5: デプロイメント（1時間）**
+```
+□ ビルド最適化
+□ CNAME設定
+□ デプロイ
+```
+
+### 18.8 更新されたワークフロー図
+
+```
+起動
+  ↓
+難易度選択 → 激辛を含む4つから選択
+  ↓
+編集モード（初回 or 「盤面を再編集」押下時）
+  ↓
+パレットから選択 → 盤面に配置
+  ↓（繰り返し）
+編集完了 → 初期盤面として保存
+  ↓
+入れ替えモード
+  ↓
+パネル2つ選択 → 入れ替え → 履歴記録
+  ↓（繰り返し）
+初期化 → 保存した初期盤面に戻る
+```
+
+---
+
+## 19. ライセンス
 
 ### 18.1 使用ライブラリのライセンス確認
 ```
@@ -1044,9 +1697,15 @@ SOFTWARE.
 4. `vite.config.ts`の`base`設定を`'/'`に設定（カスタムドメイン使用時）
 5. Node.js 18+の環境を確認
 
+**重要な仕様変更（2/15更新）:**
+1. 激辛難易度を追加（4×6、景品11個）
+2. 初期パターン選択機能を削除
+3. パレット方式の盤面エディット機能を実装
+4. 編集モードと入れ替えモードの切り替え機能を実装
+
 **実装の優先順位:**
-1. Phase 1-2: 基本機能（盤面表示、入れ替え）
-2. Phase 3: 高度な機能（履歴、編集モード）
+1. Phase 1-2: 基本UI（パレット、エディット機能）
+2. Phase 3: 入れ替え機能
 3. Phase 4-5: UX改善とデプロイ
 
-全ての機能が実装されると、ユーザーはブラウザ上で直感的にラッキーパネルの盤面を操作し、攻略をサポートできるツールが完成します。
+全ての機能が実装されると、ユーザーはパレットから素早くパネルを選択して盤面を設定し、その後の入れ替え操作をトレースできるツールが完成します。
