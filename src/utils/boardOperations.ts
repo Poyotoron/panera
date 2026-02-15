@@ -1,8 +1,10 @@
-import type { Panel, PanelType } from "../types";
+import type { Difficulty, Panel, PanelType } from "../types";
+import { DIFFICULTY_CONFIG } from "../data/difficultyConfig";
 
 export function labelToPanelType(label: string): PanelType {
   if (label === "+") return "chance";
   if (label === "-") return "shuffle";
+  if (label === "") return "empty";
   return "prize";
 }
 
@@ -15,6 +17,24 @@ export function layoutToBoard(layout: string[][]): Panel[][] {
       position: { row: rowIndex, col: colIndex },
     }))
   );
+}
+
+export function createEmptyBoard(difficulty: Difficulty): Panel[][] {
+  const config = DIFFICULTY_CONFIG[difficulty];
+  const board: Panel[][] = [];
+  for (let r = 0; r < config.rows; r++) {
+    const row: Panel[] = [];
+    for (let c = 0; c < config.cols; c++) {
+      row.push({
+        id: `${r}-${c}`,
+        type: "empty",
+        label: "",
+        position: { row: r, col: c },
+      });
+    }
+    board.push(row);
+  }
+  return board;
 }
 
 export function swapPanels(
@@ -38,21 +58,21 @@ export function swapPanels(
   return newBoard;
 }
 
-const EDIT_CYCLE = [
-  "A", "B", "C", "D", "E", "F", "G", "H", "I", "+", "-",
-];
-
-export function getNextLabel(currentLabel: string): string {
-  const index = EDIT_CYCLE.indexOf(currentLabel);
-  if (index === -1) return "A";
-  return EDIT_CYCLE[(index + 1) % EDIT_CYCLE.length];
+export function cloneBoard(board: Panel[][]): Panel[][] {
+  return board.map((row) => row.map((panel) => ({ ...panel })));
 }
 
-export function cyclePanel(panel: Panel): Panel {
-  const nextLabel = getNextLabel(panel.label);
-  return {
-    ...panel,
-    label: nextLabel,
-    type: labelToPanelType(nextLabel),
+export function placePanelOnBoard(
+  board: Panel[][],
+  row: number,
+  col: number,
+  label: string
+): Panel[][] {
+  const newBoard = board.map((r) => r.map((p) => ({ ...p })));
+  newBoard[row][col] = {
+    ...newBoard[row][col],
+    label,
+    type: labelToPanelType(label),
   };
+  return newBoard;
 }

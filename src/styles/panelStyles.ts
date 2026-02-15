@@ -29,10 +29,34 @@ export const PANEL_STYLES: Record<PanelType, PanelStyle> = {
     text: "text-white font-bold",
     extra: "shadow-lg shadow-green-400/50",
   },
+  empty: {
+    background: "bg-gray-100",
+    hover: "hover:bg-gray-200",
+    selected: "",
+    text: "text-gray-400",
+  },
 };
 
-export function getPanelClasses(type: PanelType, isSelected: boolean): string {
+export function getPanelClasses(
+  type: PanelType,
+  isSelected: boolean,
+  isEditMode: boolean
+): string {
   const style = PANEL_STYLES[type];
+
+  if (type === "empty") {
+    return [
+      "w-14 h-14 sm:w-16 sm:h-16 rounded-lg text-xl sm:text-2xl",
+      "transition-all duration-200",
+      "border-2 border-dashed border-gray-400",
+      style.background,
+      isEditMode ? "hover:bg-gray-200 cursor-pointer" : "cursor-default",
+      style.text,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
   return [
     "w-14 h-14 sm:w-16 sm:h-16 rounded-lg text-xl sm:text-2xl font-bold",
     "transition-all duration-200 cursor-pointer",
