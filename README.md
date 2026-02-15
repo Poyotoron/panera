@@ -74,31 +74,12 @@ npx gh-pages -d dist
 
 リポジトリの Settings > Pages で Source を **Deploy from a branch** > `gh-pages` に設定してください。
 
-### カスタムドメイン設定
-
-1. `public/CNAME` に `panera.maaaaa.net` が記載済み（ビルド時に `dist/` へコピーされます）
-2. GitHub リポジトリの Settings > Pages > Custom domain に `panera.maaaaa.net` を入力
-3. 「Enforce HTTPS」にチェック
-4. Cloudflare DNS に以下のいずれかを設定:
-   - **CNAME レコード**: `panera` → `<username>.github.io`
-   - **A レコード**（4件）:
-     ```
-     185.199.108.153
-     185.199.109.153
-     185.199.110.153
-     185.199.111.153
-     ```
-5. Cloudflare の SSL/TLS 設定を「Full」に変更
-
-> DNS の反映に数分〜数時間、HTTPS 証明書の発行に最大24時間かかる場合があります。
-
 ## Tech Stack
 
 - React 19 + TypeScript 5.9
 - Vite 7
 - TailwindCSS 4
-- GitHub Pages (Custom Domain: panera.maaaaa.net)
-- Cloudflare DNS
+- GitHub Pages
 
 ## License
 
