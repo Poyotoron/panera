@@ -2,6 +2,7 @@ import type { Action, AppState } from "../types";
 import {
   cloneBoard,
   createEmptyBoard,
+  applyDetectedPanels,
   placePanelOnBoard,
   swapPanels,
 } from "../utils/boardOperations";
@@ -71,6 +72,18 @@ export function appReducer(state: AppState, action: Action): AppState {
         initialBoard: cloneBoard(action.payload),
         editMode: false,
       };
+
+    case "APPLY_RECOGNITION": {
+      const newBoard = applyDetectedPanels(state.difficulty, action.payload);
+      return {
+        ...state,
+        board: newBoard,
+        editMode: true,
+        selectedPalettePanel: null,
+        selectedPanel: null,
+        history: [],
+      };
+    }
 
     case "SELECT_PANEL":
       return {

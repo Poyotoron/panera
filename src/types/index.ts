@@ -28,6 +28,22 @@ export interface AppState {
   initialBoard: Panel[][] | null;
 }
 
+export interface DetectedPanel {
+  position: { row: number; col: number };
+  type: "prize" | "chance" | "shuffle";
+  label: string;
+  confidence: number;
+  imageHash?: string;
+}
+
+export interface RecognitionResult {
+  success: boolean;
+  confidence: number;
+  panels: DetectedPanel[];
+  errors?: string[];
+  processingTime: number;
+}
+
 export type Action =
   | { type: "SET_DIFFICULTY"; payload: Difficulty }
   | { type: "SELECT_PALETTE_PANEL"; payload: string }
@@ -36,6 +52,7 @@ export type Action =
   | { type: "CLEAR_BOARD" }
   | { type: "RE_EDIT" }
   | { type: "LOAD_SAVED_BOARD"; payload: Panel[][] }
+  | { type: "APPLY_RECOGNITION"; payload: DetectedPanel[] }
   | { type: "SELECT_PANEL"; payload: Panel }
   | { type: "DESELECT_PANEL" }
   | { type: "SWAP_PANELS"; payload: { panel1: Panel; panel2: Panel } }

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef } from "react";
+import type React from "react";
 import { useAppContext } from "../../context/AppContext";
 import { PanelCell } from "./PanelCell";
+import { useTouchDrag } from "../../hooks/useTouchDrag";
 
 export function BoardGrid() {
   const { state, dispatch } = useAppContext();
@@ -40,22 +42,43 @@ export function BoardGrid() {
     }
   }
 
-  function handlePointerDown(row: number, col: number) {
+  function handlePointerDown(
+    event: React.PointerEvent<HTMLButtonElement>,
+    row: number,
+    col: number
+  ) {
     if (!state.editMode) return;
+    if (event.pointerType === "touch") return;
     isDragging.current = true;
     placePanel(row, col);
   }
 
-  function handlePointerEnter(row: number, col: number) {
+  function handlePointerEnter(
+    event: React.PointerEvent<HTMLButtonElement>,
+    row: number,
+    col: number
+  ) {
     if (!state.editMode || !isDragging.current) return;
+    if (event.pointerType === "touch") return;
     placePanel(row, col);
   }
+
+  const touchDrag = useTouchDrag(
+    state.editMode ? state.selectedPalettePanel : null,
+    placePanel
+  );
 
   return (
     <div className="bg-white rounded-lg shadow p-4 sm:p-6">
       <div
-        className="flex flex-col gap-2 items-center select-none"
+        className={`flex flex-col gap-2 items-center select-none ${
+          touchDrag.isDragging ? "ring-2 ring-indigo-200 rounded-lg p-2" : ""
+        }`}
         onDragStart={(e) => e.preventDefault()}
+        onTouchStart={state.editMode ? touchDrag.handleTouchStart : undefined}
+        onTouchMove={state.editMode ? touchDrag.handleTouchMove : undefined}
+        onTouchEnd={state.editMode ? touchDrag.handleTouchEnd : undefined}
+        style={state.editMode ? { touchAction: "none" } : undefined}
       >
         {state.board.map((row, rowIndex) => (
           <div key={rowIndex} className="flex gap-2">
@@ -66,8 +89,14 @@ export function BoardGrid() {
                 isSelected={!state.editMode && state.selectedPanel?.id === panel.id}
                 isEditMode={state.editMode}
                 onClick={() => handlePanelClick(panel)}
-                onPointerDown={() => handlePointerDown(panel.position.row, panel.position.col)}
-                onPointerEnter={() => handlePointerEnter(panel.position.row, panel.position.col)}
+                onPointerDown={(event) =>
+                  handlePointerDown(event, panel.position.row, panel.position.col)
+                }
+                onPointerEnter={(event) =>
+                  handlePointerEnter(event, panel.position.row, panel.position.col)
+                }
+                dataRow={panel.position.row}
+                dataCol={panel.position.col}
               />
             ))}
           </div>
