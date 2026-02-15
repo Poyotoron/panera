@@ -1,14 +1,19 @@
 import type { Action, AppState } from "../types";
-import { INITIAL_PATTERNS } from "../data/patterns";
-import { cyclePanel, layoutToBoard, swapPanels } from "../utils/boardOperations";
+import {
+  cloneBoard,
+  createEmptyBoard,
+  placePanelOnBoard,
+  swapPanels,
+} from "../utils/boardOperations";
 
 export const initialState: AppState = {
   difficulty: "easy",
-  selectedPattern: null,
-  board: [],
+  board: createEmptyBoard("easy"),
   selectedPanel: null,
   history: [],
-  isEditMode: false,
+  editMode: true,
+  selectedPalettePanel: null,
+  initialBoard: null,
 };
 
 export function appReducer(state: AppState, action: Action): AppState {
@@ -17,23 +22,55 @@ export function appReducer(state: AppState, action: Action): AppState {
       return {
         ...initialState,
         difficulty: action.payload,
+        board: createEmptyBoard(action.payload),
       };
 
-    case "LOAD_PATTERN": {
-      const pattern = INITIAL_PATTERNS.find(
-        (p) =>
-          p.difficulty === state.difficulty && p.patternId === action.payload
-      );
-      if (!pattern) return state;
+    case "SELECT_PALETTE_PANEL":
       return {
         ...state,
-        selectedPattern: action.payload,
-        board: layoutToBoard(pattern.layout),
-        selectedPanel: null,
-        history: [],
-        isEditMode: false,
+        selectedPalettePanel: action.payload,
+      };
+
+    case "PLACE_PANEL": {
+      if (state.selectedPalettePanel === null) return state;
+      const { row, col } = action.payload;
+      return {
+        ...state,
+        board: placePanelOnBoard(state.board, row, col, state.selectedPalettePanel),
       };
     }
+
+    case "FINISH_EDITING":
+      return {
+        ...state,
+        editMode: false,
+        initialBoard: cloneBoard(state.board),
+        selectedPalettePanel: null,
+        selectedPanel: null,
+        history: [],
+      };
+
+    case "CLEAR_BOARD":
+      return {
+        ...state,
+        board: createEmptyBoard(state.difficulty),
+      };
+
+    case "RE_EDIT":
+      return {
+        ...state,
+        editMode: true,
+        selectedPanel: null,
+        history: [],
+      };
+
+    case "LOAD_SAVED_BOARD":
+      return {
+        ...state,
+        board: action.payload,
+        initialBoard: cloneBoard(action.payload),
+        editMode: false,
+      };
 
     case "SELECT_PANEL":
       return {
@@ -78,16 +115,10 @@ export function appReducer(state: AppState, action: Action): AppState {
     }
 
     case "RESET_BOARD": {
-      if (state.selectedPattern === null) return state;
-      const pattern = INITIAL_PATTERNS.find(
-        (p) =>
-          p.difficulty === state.difficulty &&
-          p.patternId === state.selectedPattern
-      );
-      if (!pattern) return state;
+      if (!state.initialBoard) return state;
       return {
         ...state,
-        board: layoutToBoard(pattern.layout),
+        board: cloneBoard(state.initialBoard),
         selectedPanel: null,
         history: [],
       };
@@ -98,24 +129,6 @@ export function appReducer(state: AppState, action: Action): AppState {
         ...state,
         history: [],
       };
-
-    case "TOGGLE_EDIT_MODE":
-      return {
-        ...state,
-        isEditMode: !state.isEditMode,
-        selectedPanel: null,
-      };
-
-    case "EDIT_PANEL": {
-      const panel = action.payload;
-      const newBoard = state.board.map((row) => row.map((p) => ({ ...p })));
-      const cycled = cyclePanel(panel);
-      newBoard[panel.position.row][panel.position.col] = cycled;
-      return {
-        ...state,
-        board: newBoard,
-      };
-    }
 
     default:
       return state;

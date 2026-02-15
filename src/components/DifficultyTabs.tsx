@@ -5,6 +5,7 @@ const TABS: { key: Difficulty; label: string }[] = [
   { key: "easy", label: "甘口" },
   { key: "medium", label: "中辛" },
   { key: "hard", label: "辛口" },
+  { key: "expert", label: "激辛" },
 ];
 
 export function DifficultyTabs() {

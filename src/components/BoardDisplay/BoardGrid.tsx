@@ -4,19 +4,18 @@ import { PanelCell } from "./PanelCell";
 export function BoardGrid() {
   const { state, dispatch } = useAppContext();
 
-  if (state.board.length === 0) {
-    return (
-      <div className="bg-white rounded-lg shadow p-8 text-center text-gray-400">
-        パターンを選択してください
-      </div>
-    );
-  }
-
   function handlePanelClick(panel: (typeof state.board)[number][number]) {
-    if (state.isEditMode) {
-      dispatch({ type: "EDIT_PANEL", payload: panel });
+    if (state.editMode) {
+      // In edit mode, place the selected palette panel
+      dispatch({
+        type: "PLACE_PANEL",
+        payload: { row: panel.position.row, col: panel.position.col },
+      });
       return;
     }
+
+    // In swap mode
+    if (panel.type === "empty") return;
 
     if (state.selectedPanel === null) {
       dispatch({ type: "SELECT_PANEL", payload: panel });
@@ -39,7 +38,8 @@ export function BoardGrid() {
               <PanelCell
                 key={panel.id}
                 panel={panel}
-                isSelected={state.selectedPanel?.id === panel.id}
+                isSelected={!state.editMode && state.selectedPanel?.id === panel.id}
+                isEditMode={state.editMode}
                 onClick={() => handlePanelClick(panel)}
               />
             ))}
@@ -47,9 +47,11 @@ export function BoardGrid() {
         ))}
       </div>
       <div className="mt-3 text-center text-sm text-gray-500">
-        {state.isEditMode ? (
+        {state.editMode ? (
           <span className="text-indigo-600 font-semibold">
-            編集モード: パネルをクリックして種類を変更
+            {state.selectedPalettePanel !== null
+              ? `編集モード: パレットから「${state.selectedPalettePanel === "" ? "消去" : state.selectedPalettePanel}」を選択中`
+              : "編集モード: パレットからパネルを選択してください"}
           </span>
         ) : state.selectedPanel ? (
           <span>
@@ -66,7 +68,7 @@ export function BoardGrid() {
       <div className="mt-4 pt-3 border-t border-gray-200 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-gray-500">
         <span className="flex items-center gap-1">
           <span className="inline-block w-3 h-3 rounded bg-blue-500" />
-          A〜I: 景品
+          景品
         </span>
         <span className="flex items-center gap-1">
           <span className="inline-block w-3 h-3 rounded bg-green-500" />
