@@ -7,12 +7,12 @@ type CellData = {
   row: number;
   col: number;
   imageData: ImageData;
+  signature: CellSignature;
 };
 
-type PanelGroup = {
-  hash: string;
-  members: CellData[];
-  dominantColor?: RGB;
+type CellSignature = {
+  grayscale: number[];
+  avgColor: RGB;
 };
 
 type RGB = { r: number; g: number; b: number };
@@ -20,9 +20,11 @@ type RGB = { r: number; g: number; b: number };
 type HSV = { h: number; s: number; v: number };
 
 export class PanelRecognizer {
+  private difficulty: DifficultyKey;
   private gridSize: { rows: number; cols: number };
 
   constructor(difficulty: DifficultyKey) {
+    this.difficulty = difficulty;
     this.gridSize = DIFFICULTY_CONFIG[difficulty];
   }
 
@@ -32,8 +34,7 @@ export class PanelRecognizer {
       const image = await this.loadImage(imageFile);
       const gridRegion = this.detectGridRegion(image);
       const cells = this.extractCells(image, gridRegion);
-      const groups = await this.groupSimilarCells(cells);
-      const panels = this.classifyPanelGroups(groups);
+      const panels = this.classifyDetectedPanels(cells);
       const confidence = this.calculateConfidence(panels);
       return {
         success: true,
@@ -90,7 +91,10 @@ export class PanelRecognizer {
     };
   }
 
-  private extractCells(image: ImageData, region: { x: number; y: number; width: number; height: number }) {
+  private extractCells(
+    image: ImageData,
+    region: { x: number; y: number; width: number; height: number }
+  ) {
     const { rows, cols } = this.gridSize;
     const cellWidth = region.width / cols;
     const cellHeight = region.height / rows;
@@ -103,7 +107,8 @@ export class PanelRecognizer {
         const w = Math.floor(cellWidth);
         const h = Math.floor(cellHeight);
         const cellImageData = this.extractRegion(image, x, y, w, h);
-        cells.push({ row, col, imageData: cellImageData });
+        const signature = this.buildSignature(cellImageData);
+        cells.push({ row, col, imageData: cellImageData, signature });
       }
     }
 
@@ -122,100 +127,114 @@ export class PanelRecognizer {
     return ctx.getImageData(x, y, width, height);
   }
 
-  private async groupSimilarCells(cells: CellData[]): Promise<PanelGroup[]> {
-    const groups: PanelGroup[] = [];
-    const threshold = 0.85;
-
-    for (const cell of cells) {
-      const hash = await this.calculatePerceptualHash(cell.imageData);
-      let addedToGroup = false;
-      for (const group of groups) {
-        const similarity = this.compareHashes(hash, group.hash);
-        if (similarity >= threshold) {
-          group.members.push(cell);
-          addedToGroup = true;
-          break;
-        }
-      }
-      if (!addedToGroup) {
-        groups.push({
-          hash,
-          members: [cell],
-          dominantColor: this.getDominantColor(cell.imageData),
-        });
-      }
-    }
-
-    return groups;
-  }
-
-  private async calculatePerceptualHash(imageData: ImageData): Promise<string> {
-    const resized = this.resizeImage(imageData, 8, 8);
-    const gray = this.toGrayscale(resized);
-    const avg = this.calculateAverage(gray);
-    let hash = "";
-    for (let i = 0; i < gray.length; i += 1) {
-      hash += gray[i] >= avg ? "1" : "0";
-    }
-    return hash;
-  }
-
-  private compareHashes(hash1: string, hash2: string): number {
-    if (hash1.length !== hash2.length) return 0;
-    let differences = 0;
-    for (let i = 0; i < hash1.length; i += 1) {
-      if (hash1[i] !== hash2[i]) differences += 1;
-    }
-    return 1 - differences / hash1.length;
-  }
-
-  private classifyPanelGroups(groups: PanelGroup[]): DetectedPanel[] {
+  private classifyDetectedPanels(cells: CellData[]): DetectedPanel[] {
+    const { pairs, singles } = this.buildPrizePairs(cells);
     const panels: DetectedPanel[] = [];
-    let prizeIndex = 0;
     const prizeLabels = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"];
 
-    groups.sort((a, b) => b.members.length - a.members.length);
-
-    for (const group of groups) {
-      const groupSize = group.members.length;
-      if (groupSize === 2) {
-        const label = prizeLabels[prizeIndex] ?? "A";
-        prizeIndex += 1;
-        for (const member of group.members) {
-          panels.push({
-            position: { row: member.row, col: member.col },
-            type: "prize",
-            label,
-            confidence: 0.9,
-            imageHash: group.hash,
-          });
-        }
-      } else if (groupSize === 1) {
-        const member = group.members[0];
-        const type = this.classifySpecialPanel(group.dominantColor);
+    pairs.forEach((pair, index) => {
+      const label = prizeLabels[index] ?? "A";
+      pair.members.forEach((member) => {
         panels.push({
           position: { row: member.row, col: member.col },
-          type,
-          label: type === "chance" ? "+" : "-",
-          confidence: 0.85,
-          imageHash: group.hash,
+          type: "prize",
+          label,
+          confidence: pair.confidence,
+        });
+      });
+    });
+
+    singles.forEach((member) => {
+      const type = this.classifySpecialPanel(member.signature.avgColor);
+      panels.push({
+        position: { row: member.row, col: member.col },
+        type,
+        label: type === "chance" ? "+" : "-",
+        confidence: 0.8,
+      });
+    });
+
+    return panels;
+  }
+
+  private buildPrizePairs(cells: CellData[]) {
+    const pairCount = DIFFICULTY_CONFIG[this.difficulty].prizes;
+    const candidates: { i: number; j: number; distance: number }[] = [];
+
+    for (let i = 0; i < cells.length; i += 1) {
+      for (let j = i + 1; j < cells.length; j += 1) {
+        candidates.push({
+          i,
+          j,
+          distance: this.signatureDistance(cells[i].signature, cells[j].signature),
         });
       }
     }
 
-    return panels;
+    candidates.sort((a, b) => a.distance - b.distance);
+
+    const used = new Set<number>();
+    const pairs: { members: [CellData, CellData]; confidence: number }[] = [];
+
+    for (const candidate of candidates) {
+      if (pairs.length >= pairCount) break;
+      if (used.has(candidate.i) || used.has(candidate.j)) continue;
+      used.add(candidate.i);
+      used.add(candidate.j);
+      const confidence = Math.max(0.4, 1 - candidate.distance * 2.5);
+      pairs.push({
+        members: [cells[candidate.i], cells[candidate.j]],
+        confidence,
+      });
+    }
+
+    const singles = cells.filter((_, index) => !used.has(index));
+    return { pairs, singles };
+  }
+
+  private buildSignature(imageData: ImageData): CellSignature {
+    const resized = this.resizeImage(imageData, 12, 12);
+    const grayscale = this.toGrayscale(resized).map((value) => value / 255);
+    const avgColor = this.getDominantColor(imageData);
+    return { grayscale, avgColor };
+  }
+
+  private signatureDistance(a: CellSignature, b: CellSignature): number {
+    const grayDistance = this.vectorDistance(a.grayscale, b.grayscale);
+    const colorDistance = this.colorDistance(a.avgColor, b.avgColor);
+    return grayDistance * 0.75 + colorDistance * 0.25;
+  }
+
+  private vectorDistance(a: number[], b: number[]): number {
+    if (a.length !== b.length) return 1;
+    let sum = 0;
+    for (let i = 0; i < a.length; i += 1) {
+      const diff = a[i] - b[i];
+      sum += diff * diff;
+    }
+    return Math.sqrt(sum / a.length);
+  }
+
+  private colorDistance(a: RGB, b: RGB): number {
+    const dr = (a.r - b.r) / 255;
+    const dg = (a.g - b.g) / 255;
+    const db = (a.b - b.b) / 255;
+    return Math.sqrt((dr * dr + dg * dg + db * db) / 3);
   }
 
   private classifySpecialPanel(color?: RGB): "chance" | "shuffle" {
     if (!color) return "shuffle";
     const hsv = this.rgbToHsv(color);
-    if (hsv.h >= 40 && hsv.h <= 70 && hsv.s > 0.5) {
-      return "chance";
-    }
-    if (hsv.h >= 270 && hsv.h <= 290 && hsv.s > 0.4) {
-      return "shuffle";
-    }
-    return "shuffle";
+    const yellowHue = 55;
+    const purpleHue = 285;
+    const yellowScore = this.hueDistance(hsv.h, yellowHue) + (1 - hsv.s) * 40;
+    const purpleScore = this.hueDistance(hsv.h, purpleHue) + (1 - hsv.s) * 40;
+    return yellowScore <= purpleScore ? "chance" : "shuffle";
+  }
+
+  private hueDistance(a: number, b: number): number {
+    const diff = Math.abs(a - b);
+    return Math.min(diff, 360 - diff);
   }
 
   private getDominantColor(imageData: ImageData): RGB {
@@ -295,11 +314,6 @@ export class PanelRecognizer {
       gray.push(0.299 * r + 0.587 * g + 0.114 * b);
     }
     return gray;
-  }
-
-  private calculateAverage(values: number[]): number {
-    const sum = values.reduce((a, b) => a + b, 0);
-    return sum / values.length;
   }
 
   private calculateConfidence(panels: DetectedPanel[]): number {
