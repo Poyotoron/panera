@@ -35,7 +35,7 @@ export function ImageRecognitionPanel({
       }
     } catch {
       window.alert(
-        "カメラへのアクセスに失敗しました。ブラウザの設定で許可を確認してください。"
+        "カメラへのアクセスに失敗しました。ブラウザの設定で許可を確認してください。",
       );
     }
   };
@@ -60,13 +60,13 @@ export function ImageRecognitionPanel({
         window.alert(
           `盤面を読み取りました。信頼度: ${(
             recognition.confidence * 100
-          ).toFixed(1)}%`
+          ).toFixed(1)}%`,
         );
       } else if (recognition.success) {
         const confirmed = window.confirm(
           `認識精度が低い可能性があります（${(
             recognition.confidence * 100
-          ).toFixed(1)}%）。それでも適用しますか？`
+          ).toFixed(1)}%）。それでも適用しますか？`,
         );
         if (confirmed) {
           onRecognitionComplete(recognition.panels);
@@ -96,12 +96,14 @@ export function ImageRecognitionPanel({
       canvas.toBlob((b) => resolve(b ?? new Blob()), "image/png");
     });
 
-    await recognizeImage(new File([blob], "capture.png", { type: "image/png" }));
+    await recognizeImage(
+      new File([blob], "capture.png", { type: "image/png" }),
+    );
     stopCamera();
   };
 
   const handleFileUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = event.target.files?.[0];
     if (!file) return;
