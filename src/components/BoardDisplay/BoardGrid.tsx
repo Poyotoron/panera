@@ -1,18 +1,29 @@
+import { useCallback, useEffect, useRef } from "react";
 import { useAppContext } from "../../context/AppContext";
 import { PanelCell } from "./PanelCell";
 
 export function BoardGrid() {
   const { state, dispatch } = useAppContext();
+  const isDragging = useRef(false);
+
+  const placePanel = useCallback(
+    (row: number, col: number) => {
+      if (state.selectedPalettePanel === null) return;
+      dispatch({ type: "PLACE_PANEL", payload: { row, col } });
+    },
+    [state.selectedPalettePanel, dispatch]
+  );
+
+  useEffect(() => {
+    function handlePointerUp() {
+      isDragging.current = false;
+    }
+    window.addEventListener("pointerup", handlePointerUp);
+    return () => window.removeEventListener("pointerup", handlePointerUp);
+  }, []);
 
   function handlePanelClick(panel: (typeof state.board)[number][number]) {
-    if (state.editMode) {
-      // In edit mode, place the selected palette panel
-      dispatch({
-        type: "PLACE_PANEL",
-        payload: { row: panel.position.row, col: panel.position.col },
-      });
-      return;
-    }
+    if (state.editMode) return; // edit mode uses pointer events instead
 
     // In swap mode
     if (panel.type === "empty") return;
@@ -29,9 +40,23 @@ export function BoardGrid() {
     }
   }
 
+  function handlePointerDown(row: number, col: number) {
+    if (!state.editMode) return;
+    isDragging.current = true;
+    placePanel(row, col);
+  }
+
+  function handlePointerEnter(row: number, col: number) {
+    if (!state.editMode || !isDragging.current) return;
+    placePanel(row, col);
+  }
+
   return (
     <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-      <div className="flex flex-col gap-2 items-center">
+      <div
+        className="flex flex-col gap-2 items-center select-none"
+        onDragStart={(e) => e.preventDefault()}
+      >
         {state.board.map((row, rowIndex) => (
           <div key={rowIndex} className="flex gap-2">
             {row.map((panel) => (
@@ -41,6 +66,8 @@ export function BoardGrid() {
                 isSelected={!state.editMode && state.selectedPanel?.id === panel.id}
                 isEditMode={state.editMode}
                 onClick={() => handlePanelClick(panel)}
+                onPointerDown={() => handlePointerDown(panel.position.row, panel.position.col)}
+                onPointerEnter={() => handlePointerEnter(panel.position.row, panel.position.col)}
               />
             ))}
           </div>
@@ -50,7 +77,7 @@ export function BoardGrid() {
         {state.editMode ? (
           <span className="text-indigo-600 font-semibold">
             {state.selectedPalettePanel !== null
-              ? `編集モード: パレットから「${state.selectedPalettePanel === "" ? "消去" : state.selectedPalettePanel}」を選択中`
+              ? `編集モード: パレットから「${state.selectedPalettePanel === "" ? "消去" : state.selectedPalettePanel}」を選択中（ドラッグで連続配置）`
               : "編集モード: パレットからパネルを選択してください"}
           </span>
         ) : state.selectedPanel ? (
