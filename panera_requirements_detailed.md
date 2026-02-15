@@ -8,8 +8,9 @@ DQ7 Reimagined（ドラゴンクエスト7 リメイク版）のラッキーパ�
 ### 1.2 コンセプト
 - クライアントサイドのみで完結する軽量ツール
 - GitHub Pages上でホスティング（カスタムドメイン: panera.maaaaa.net）
-- 直感的な操作で盤面の状態を管理
-- 複数の難易度とパターンに対応
+- 直感的な操作で盤面の状態を管理（パレット選択 + クリック/タップ/指なぞり）
+- カメラ/画像認識による盤面の自動読み取り機能
+- 複数の難易度とパターンに対応（甘口/中辛/辛口/激辛）
 
 ### 1.3 技術スタック
 ```
@@ -858,7 +859,8 @@ panera/
 │   ├── components/
 │   │   ├── Header.tsx
 │   │   ├── DifficultyTabs.tsx
-│   │   ├── PatternSelector.tsx
+│   │   ├── PanelPalette.tsx          // パレット選択UI
+│   │   ├── ImageRecognitionPanel.tsx  // 画像認識UI
 │   │   ├── BoardDisplay/
 │   │   │   ├── BoardGrid.tsx
 │   │   │   ├── PanelCell.tsx
@@ -868,18 +870,29 @@ panera/
 │   ├── context/
 │   │   ├── AppContext.tsx
 │   │   └── AppReducer.ts
+│   ├── hooks/
+│   │   └── useTouchDrag.ts          // タッチドラッグ
 │   ├── data/
-│   │   └── patterns.ts          // 初期パターン定義
+│   │   └── difficultyConfig.ts       // 難易度設定
 │   ├── types/
-│   │   └── index.ts              // TypeScript型定義
+│   │   └── index.ts                  // TypeScript型定義
 │   ├── utils/
-│   │   ├── boardOperations.ts    // 盤面操作ユーティリティ
-│   │   └── animations.ts         // アニメーション関数
+│   │   ├── boardOperations.ts        // 盤面操作ユーティリティ
+│   │   ├── PanelRecognizer.ts        // 画像認識エンジン
+│   │   ├── localStorage.ts           // 永続化ユーティリティ
+│   │   └── animations.ts             // アニメーション関数
 │   ├── styles/
-│   │   └── panelStyles.ts        // パネルスタイル定義
+│   │   └── panelStyles.ts            // パネルスタイル定義
 │   ├── App.tsx
 │   ├── main.tsx
 │   └── index.css
+├── .test_images/                     // 画像認識用テスト画像
+│   ├── easy/
+│   │   ├── sample1.png
+│   │   └── ...
+│   ├── medium/
+│   ├── hard/
+│   └── expert/
 ├── .gitignore
 ├── index.html
 ├── package.json
@@ -1086,11 +1099,13 @@ DQ7 Reimagined（ドラゴンクエスト7 リメイク版）のラッキーパ�
 
 ## Features
 
-- 🎮 3つの難易度（甘口/中辛/辛口）に対応
-- 📋 各難易度の初期パターンをプリセット
+- 🎮 4つの難易度（甘口/中辛/辛口/激辛）に対応
+- 🎨 パレット方式の直感的な盤面エディット機能
+- 📱 スマホ対応：指なぞりで連続配置
+- 📸 カメラ/画像認識による盤面自動読み取り
 - 🔄 パネルの入れ替え操作をトレース
 - 📝 操作履歴の記録と表示
-- ✏️ カスタム編集モードで独自パターン作成
+- 💾 盤面の自動保存（localStorage）
 - 📱 レスポンシブデザイン対応
 
 ## Demo
@@ -1151,17 +1166,22 @@ MIT License - see [LICENSE](LICENSE) file for details
 ### コア機能
 ```
 □ 型定義（types/index.ts）
-□ 初期パターンデータ（data/patterns.ts）
+□ 初期パターンデータ（data/patterns.ts）→ 削除
+□ 難易度設定（激辛を含む4つ）
 □ Context/Reducer設定
 □ 難易度タブ
-□ パターン選択ボタン
-□ 盤面グリッド表示
+□ パレット選択UI
+□ 盤面グリッド表示（動的サイズ対応）
 □ パネルセルコンポーネント
-□ パネル選択ロジック
+□ パネル配置ロジック（クリック）
+□ タッチドラッグ機能（指なぞり配置）  // NEW
 □ パネル入れ替えロジック
 □ 初期化機能
 □ 履歴表示
 □ 履歴クリア
+□ モード切り替え（編集⇄入れ替え）
+□ 画像認識エンジン                    // NEW
+□ カメラ/画像アップロードUI            // NEW
 ```
 
 ### UI/UX
@@ -1630,7 +1650,1084 @@ panera/
 
 ---
 
-## 19. ライセンス
+## 19. 2/15追加分その2：スマホUX改善と画像認識
+
+### 19.1 スマホ向け指なぞり配置機能
+
+#### 課題
+スマホでの盤面設定時、タップ操作は以下の問題がある：
+- 24マス（激辛）を1つずつタップするのは時間がかかる
+- パネルサイズが小さい場合、タップミスが発生しやすい
+- より直感的な入力方法が求められる
+
+#### 解決策：ドラッグ＆ペイント方式
+
+**操作フロー:**
+```
+1. パレットからパネルを選択（例: "B"をタップ）
+   → 選択状態になる
+
+2. 盤面グリッド上を指でなぞる
+   → なぞったマス全てに選択中のパネルが配置される
+   → リアルタイムでプレビュー表示
+
+3. 指を離す
+   → 配置確定
+```
+
+#### タッチイベント実装
+
+**カスタムフック: useTouchDrag.ts**
+```typescript
+interface TouchDragState {
+  isDragging: boolean;
+  currentPanel: string | null;
+  touchedCells: Set<string>;  // "row-col"形式でタッチ済みセルを追跡
+}
+
+export const useTouchDrag = (
+  selectedPanel: string | null,
+  onPlacePanel: (row: number, col: number) => void
+) => {
+  const [dragState, setDragState] = useState<TouchDragState>({
+    isDragging: false,
+    currentPanel: null,
+    touchedCells: new Set()
+  });
+
+  const handleTouchStart = (e: TouchEvent) => {
+    if (!selectedPanel) return;
+    
+    // デフォルトのスクロール動作を防止
+    e.preventDefault();
+    
+    setDragState({
+      isDragging: true,
+      currentPanel: selectedPanel,
+      touchedCells: new Set()
+    });
+    
+    // 開始位置のマスに配置
+    const cell = getCellFromTouch(e.touches[0]);
+    if (cell) {
+      onPlacePanel(cell.row, cell.col);
+      setDragState(prev => ({
+        ...prev,
+        touchedCells: new Set([`${cell.row}-${cell.col}`])
+      }));
+    }
+  };
+
+  const handleTouchMove = (e: TouchEvent) => {
+    if (!dragState.isDragging) return;
+    
+    e.preventDefault();
+    const cell = getCellFromTouch(e.touches[0]);
+    
+    if (cell) {
+      const cellKey = `${cell.row}-${cell.col}`;
+      
+      // まだ触れていないマスなら配置
+      if (!dragState.touchedCells.has(cellKey)) {
+        onPlacePanel(cell.row, cell.col);
+        setDragState(prev => ({
+          ...prev,
+          touchedCells: new Set([...prev.touchedCells, cellKey])
+        }));
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setDragState({
+      isDragging: false,
+      currentPanel: null,
+      touchedCells: new Set()
+    });
+  };
+
+  return {
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd,
+    isDragging: dragState.isDragging
+  };
+};
+
+// タッチ座標からグリッドのセルを特定
+const getCellFromTouch = (touch: Touch): { row: number; col: number } | null => {
+  const element = document.elementFromPoint(touch.clientX, touch.clientY);
+  
+  if (element?.dataset.row && element?.dataset.col) {
+    return {
+      row: parseInt(element.dataset.row),
+      col: parseInt(element.dataset.col)
+    };
+  }
+  
+  return null;
+};
+```
+
+#### BoardGridコンポーネントの更新
+
+```typescript
+const BoardGrid: React.FC<BoardGridProps> = ({
+  board,
+  editMode,
+  selectedPalettePanel,
+  onPlacePanel,
+  onPanelClick
+}) => {
+  const {
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd,
+    isDragging
+  } = useTouchDrag(
+    editMode ? selectedPalettePanel : null,
+    onPlacePanel
+  );
+  
+  return (
+    <div 
+      className={`grid gap-2 w-fit mx-auto ${isDragging ? 'select-none' : ''}`}
+      onTouchStart={editMode ? handleTouchStart : undefined}
+      onTouchMove={editMode ? handleTouchMove : undefined}
+      onTouchEnd={editMode ? handleTouchEnd : undefined}
+      style={{
+        // タッチアクション無効化でスクロール防止
+        touchAction: editMode ? 'none' : 'auto'
+      }}
+    >
+      {board.map((row, rowIndex) => (
+        <div key={rowIndex} className="flex gap-2">
+          {row.map((panel, colIndex) => (
+            <PanelCell
+              key={`${rowIndex}-${colIndex}`}
+              panel={panel}
+              size={getPanelSize()}
+              isSelected={!editMode && (
+                selectedPanels[0]?.id === panel.id ||
+                selectedPanels[1]?.id === panel.id
+              )}
+              isEditMode={editMode}
+              onClick={() => onPanelClick(panel)}
+              // data属性でセル位置を特定可能にする
+              data-row={rowIndex}
+              data-col={colIndex}
+            />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+};
+```
+
+#### PanelCellコンポーネントの更新
+
+```typescript
+interface PanelCellProps {
+  panel: Panel;
+  size: string;
+  isSelected: boolean;
+  isEditMode: boolean;
+  onClick: () => void;
+  'data-row': number;
+  'data-col': number;
+}
+
+const PanelCell: React.FC<PanelCellProps> = ({
+  panel,
+  size,
+  isSelected,
+  isEditMode,
+  onClick,
+  'data-row': dataRow,
+  'data-col': dataCol
+}) => {
+  const styles = PANEL_STYLES[panel.type];
+  
+  // 空のマス
+  if (!panel.label) {
+    return (
+      <button
+        onClick={onClick}
+        data-row={dataRow}
+        data-col={dataCol}
+        className={`
+          ${size} rounded-lg text-2xl font-bold
+          border-2 border-dashed border-gray-400
+          bg-gray-100
+          ${isEditMode ? 'hover:bg-gray-200 active:bg-gray-300' : 'cursor-not-allowed'}
+          transition-all duration-200
+        `}
+        disabled={!isEditMode}
+      >
+        　
+      </button>
+    );
+  }
+  
+  return (
+    <button
+      onClick={onClick}
+      data-row={dataRow}
+      data-col={dataCol}
+      className={`
+        ${size} rounded-lg text-2xl font-bold
+        transition-all duration-200
+        ${styles.background}
+        ${styles.hover}
+        ${styles.text}
+        ${isSelected ? styles.selected : ''}
+        ${panel.type === 'shuffle' ? styles.pulse : ''}
+        ${panel.type === 'chance' ? styles.glow : ''}
+        ${isEditMode ? 'active:scale-95' : 'active:scale-90'}
+      `}
+    >
+      {panel.label}
+    </button>
+  );
+};
+```
+
+#### UI/UXフィードバック
+
+**ドラッグ中の視覚的フィードバック:**
+```typescript
+// ドラッグ中はグリッド全体に視覚効果
+const gridClassName = `
+  grid gap-2 w-fit mx-auto
+  ${isDragging ? 'ring-4 ring-blue-300 ring-opacity-50' : ''}
+  ${isDragging ? 'select-none' : ''}
+`;
+
+// 操作ガイドの表示
+{editMode && (
+  <div className="text-center mt-2 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+    <p className="text-sm text-blue-800 font-medium">
+      💡 タップで1マス、指でなぞって連続配置
+    </p>
+    <p className="text-xs text-blue-600 mt-1">
+      パレットから選択 → 盤面をタップ or なぞる
+    </p>
+  </div>
+)}
+```
+
+#### パフォーマンス最適化
+
+```typescript
+// スロットリングで過度な更新を防ぐ
+const throttledPlacePanel = useCallback(
+  throttle((row: number, col: number) => {
+    dispatch({ type: 'PLACE_PANEL', payload: { row, col } });
+  }, 50),  // 50ms間隔
+  []
+);
+```
+
+### 19.2 カメラ/画像認識による盤面読み取り機能
+
+#### 概要
+ゲーム画面のスクリーンショットをカメラまたはファイルアップロードで読み取り、自動的に盤面を設定する機能。
+
+#### 判定ロジック
+```
+1. 画像内のパネルを検出（グリッド分割）
+2. パネルの画像特徴を抽出
+3. 同一パネルの検出:
+   【景品パネル判定】
+   - 2枚ペアで存在する → 景品パネル（A-K）
+   - アルファベット順に自動割り当て
+   
+   【特殊パネル判定】
+   - 1枚のみ存在 かつ 黄色系 → チャンスパネル（+）
+   - 1枚のみ存在 かつ 紫色系 → シャッフルパネル（-）
+   
+4. 検出結果を盤面に配置
+```
+
+#### テスト画像データ構造
+
+```
+.test_images/
+├── easy/
+│   ├── sample1.png           # 盤面全体のサンプル画像
+│   ├── panel_prize_01.png    # 景品パネルの参照画像
+│   ├── panel_prize_02.png
+│   ├── panel_chance.png      # チャンスパネル（黄色）
+│   └── panel_shuffle.png     # シャッフルパネル（紫色）
+├── medium/
+│   └── ...
+├── hard/
+│   └── ...
+└── expert/
+    └── ...
+```
+
+#### データ型定義
+
+```typescript
+interface RecognitionResult {
+  success: boolean;
+  confidence: number;  // 0-1の信頼度
+  panels: DetectedPanel[];
+  errors?: string[];
+  processingTime: number;  // ms
+}
+
+interface DetectedPanel {
+  position: { row: number; col: number };
+  type: 'prize' | 'chance' | 'shuffle';
+  label: string;  // A-K, +, -
+  confidence: number;  // この判定の信頼度
+  imageHash?: string;  // 画像のハッシュ値（デバッグ用）
+}
+
+interface PanelGroup {
+  hash: string;
+  members: {
+    row: number;
+    col: number;
+    imageData: ImageData;
+  }[];
+  dominantColor?: RGB;
+}
+```
+
+#### 画像認識エンジンの実装
+
+**PanelRecognizer.ts**
+```typescript
+export class PanelRecognizer {
+  private difficulty: 'easy' | 'medium' | 'hard' | 'expert';
+  private gridSize: { rows: number; cols: number };
+  
+  constructor(difficulty: string) {
+    this.difficulty = difficulty as any;
+    this.gridSize = this.getGridSize(difficulty);
+  }
+  
+  private getGridSize(difficulty: string) {
+    const sizes = {
+      easy: { rows: 3, cols: 4 },
+      medium: { rows: 4, cols: 4 },
+      hard: { rows: 4, cols: 5 },
+      expert: { rows: 4, cols: 6 }
+    };
+    return sizes[difficulty];
+  }
+  
+  /**
+   * メイン認識処理
+   */
+  async recognizeFromImage(imageFile: File): Promise<RecognitionResult> {
+    const startTime = performance.now();
+    
+    try {
+      // 1. 画像を読み込み
+      const image = await this.loadImage(imageFile);
+      
+      // 2. グリッド領域を検出
+      const gridRegion = this.detectGridRegion(image);
+      
+      // 3. 各セルを切り出し
+      const cells = this.extractCells(image, gridRegion);
+      
+      // 4. セルをグループ化（同一画像を検出）
+      const groups = await this.groupSimilarCells(cells);
+      
+      // 5. 各グループをパネル種類に分類
+      const panels = this.classifyPanelGroups(groups);
+      
+      // 6. 信頼度を計算
+      const confidence = this.calculateConfidence(panels);
+      
+      const processingTime = performance.now() - startTime;
+      
+      return {
+        success: true,
+        confidence,
+        panels,
+        processingTime
+      };
+      
+    } catch (error) {
+      return {
+        success: false,
+        confidence: 0,
+        panels: [],
+        errors: [error.message],
+        processingTime: performance.now() - startTime
+      };
+    }
+  }
+  
+  /**
+   * 画像を読み込んでImageDataに変換
+   */
+  private async loadImage(file: File): Promise<ImageData> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          
+          const ctx = canvas.getContext('2d')!;
+          ctx.drawImage(img, 0, 0);
+          
+          const imageData = ctx.getImageData(0, 0, img.width, img.height);
+          resolve(imageData);
+        };
+        
+        img.onerror = () => reject(new Error('画像の読み込みに失敗'));
+        img.src = e.target!.result as string;
+      };
+      
+      reader.onerror = () => reject(new Error('ファイルの読み込みに失敗'));
+      reader.readAsDataURL(file);
+    });
+  }
+  
+  /**
+   * グリッド領域を検出（簡易版：画像全体を等分割）
+   */
+  private detectGridRegion(image: ImageData) {
+    return {
+      x: 0,
+      y: 0,
+      width: image.width,
+      height: image.height
+    };
+  }
+  
+  /**
+   * 各セルを切り出し
+   */
+  private extractCells(image: ImageData, region: any): CellData[] {
+    const { rows, cols } = this.gridSize;
+    const cellWidth = region.width / cols;
+    const cellHeight = region.height / rows;
+    
+    const cells: CellData[] = [];
+    
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const x = Math.floor(region.x + col * cellWidth);
+        const y = Math.floor(region.y + row * cellHeight);
+        const w = Math.floor(cellWidth);
+        const h = Math.floor(cellHeight);
+        
+        // セル画像を切り出し
+        const cellImageData = this.extractRegion(image, x, y, w, h);
+        
+        cells.push({
+          row,
+          col,
+          imageData: cellImageData
+        });
+      }
+    }
+    
+    return cells;
+  }
+  
+  /**
+   * 画像の一部を切り出し
+   */
+  private extractRegion(
+    source: ImageData,
+    x: number,
+    y: number,
+    width: number,
+    height: number
+  ): ImageData {
+    const canvas = document.createElement('canvas');
+    canvas.width = source.width;
+    canvas.height = source.height;
+    
+    const ctx = canvas.getContext('2d')!;
+    ctx.putImageData(source, 0, 0);
+    
+    return ctx.getImageData(x, y, width, height);
+  }
+  
+  /**
+   * セルをグループ化（パーセプチュアルハッシュで類似画像を検出）
+   */
+  private async groupSimilarCells(cells: CellData[]): Promise<PanelGroup[]> {
+    const groups: PanelGroup[] = [];
+    const threshold = 0.85;  // 類似度閾値
+    
+    for (const cell of cells) {
+      const hash = await this.calculatePerceptualHash(cell.imageData);
+      
+      // 既存グループに追加できるか確認
+      let addedToGroup = false;
+      for (const group of groups) {
+        const similarity = this.compareHashes(hash, group.hash);
+        
+        if (similarity >= threshold) {
+          group.members.push(cell);
+          addedToGroup = true;
+          break;
+        }
+      }
+      
+      // 新しいグループを作成
+      if (!addedToGroup) {
+        const dominantColor = this.getDominantColor(cell.imageData);
+        groups.push({
+          hash,
+          members: [cell],
+          dominantColor
+        });
+      }
+    }
+    
+    return groups;
+  }
+  
+  /**
+   * パーセプチュアルハッシュ計算（簡易版）
+   */
+  private async calculatePerceptualHash(imageData: ImageData): Promise<string> {
+    // 8x8にリサイズ
+    const resized = this.resizeImage(imageData, 8, 8);
+    
+    // グレースケール化
+    const gray = this.toGrayscale(resized);
+    
+    // 平均値を計算
+    const avg = this.calculateAverage(gray);
+    
+    // ハッシュ生成（平均より明るい=1、暗い=0）
+    let hash = '';
+    for (let i = 0; i < gray.length; i++) {
+      hash += gray[i] >= avg ? '1' : '0';
+    }
+    
+    return hash;
+  }
+  
+  /**
+   * ハッシュ間の類似度計算（ハミング距離）
+   */
+  private compareHashes(hash1: string, hash2: string): number {
+    if (hash1.length !== hash2.length) return 0;
+    
+    let differences = 0;
+    for (let i = 0; i < hash1.length; i++) {
+      if (hash1[i] !== hash2[i]) differences++;
+    }
+    
+    const similarity = 1 - (differences / hash1.length);
+    return similarity;
+  }
+  
+  /**
+   * グループをパネル種類に分類
+   */
+  private classifyPanelGroups(groups: PanelGroup[]): DetectedPanel[] {
+    const panels: DetectedPanel[] = [];
+    let prizeIndex = 0;
+    const prizeLabels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
+    
+    // グループサイズでソート（2枚ペアを優先）
+    groups.sort((a, b) => b.members.length - a.members.length);
+    
+    for (const group of groups) {
+      const groupSize = group.members.length;
+      
+      if (groupSize === 2) {
+        // 2枚ペア → 景品パネル
+        const label = prizeLabels[prizeIndex];
+        prizeIndex++;
+        
+        for (const member of group.members) {
+          panels.push({
+            position: { row: member.row, col: member.col },
+            type: 'prize',
+            label,
+            confidence: 0.9,
+            imageHash: group.hash
+          });
+        }
+        
+      } else if (groupSize === 1) {
+        // 1枚のみ → 特殊パネル（色で判定）
+        const member = group.members[0];
+        const type = this.classifySpecialPanel(group.dominantColor!);
+        
+        panels.push({
+          position: { row: member.row, col: member.col },
+          type,
+          label: type === 'chance' ? '+' : '-',
+          confidence: 0.85,
+          imageHash: group.hash
+        });
+      }
+    }
+    
+    return panels;
+  }
+  
+  /**
+   * 特殊パネルの分類（色ベース）
+   */
+  private classifySpecialPanel(color: RGB): 'chance' | 'shuffle' {
+    const hsv = this.rgbToHsv(color);
+    
+    // 黄色判定（色相: 40-70度、彩度 > 50%）
+    if (hsv.h >= 40 && hsv.h <= 70 && hsv.s > 0.5) {
+      return 'chance';
+    }
+    
+    // 紫色判定（色相: 270-290度、彩度 > 40%）
+    if ((hsv.h >= 270 && hsv.h <= 290) && hsv.s > 0.4) {
+      return 'shuffle';
+    }
+    
+    // デフォルト（判定不能時は紫＝シャッフルとする）
+    return 'shuffle';
+  }
+  
+  /**
+   * 支配的な色を取得
+   */
+  private getDominantColor(imageData: ImageData): RGB {
+    const pixels = imageData.data;
+    let r = 0, g = 0, b = 0;
+    const pixelCount = pixels.length / 4;
+    
+    for (let i = 0; i < pixels.length; i += 4) {
+      r += pixels[i];
+      g += pixels[i + 1];
+      b += pixels[i + 2];
+    }
+    
+    return {
+      r: Math.round(r / pixelCount),
+      g: Math.round(g / pixelCount),
+      b: Math.round(b / pixelCount)
+    };
+  }
+  
+  /**
+   * RGB → HSV変換
+   */
+  private rgbToHsv(rgb: RGB): HSV {
+    const r = rgb.r / 255;
+    const g = rgb.g / 255;
+    const b = rgb.b / 255;
+    
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const delta = max - min;
+    
+    let h = 0;
+    if (delta !== 0) {
+      if (max === r) {
+        h = 60 * (((g - b) / delta) % 6);
+      } else if (max === g) {
+        h = 60 * (((b - r) / delta) + 2);
+      } else {
+        h = 60 * (((r - g) / delta) + 4);
+      }
+    }
+    
+    if (h < 0) h += 360;
+    
+    const s = max === 0 ? 0 : delta / max;
+    const v = max;
+    
+    return { h, s, v };
+  }
+  
+  /**
+   * 画像リサイズ（簡易版）
+   */
+  private resizeImage(imageData: ImageData, newWidth: number, newHeight: number): ImageData {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d')!;
+    
+    canvas.width = imageData.width;
+    canvas.height = imageData.height;
+    ctx.putImageData(imageData, 0, 0);
+    
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d')!;
+    tempCanvas.width = newWidth;
+    tempCanvas.height = newHeight;
+    
+    tempCtx.drawImage(canvas, 0, 0, newWidth, newHeight);
+    return tempCtx.getImageData(0, 0, newWidth, newHeight);
+  }
+  
+  /**
+   * グレースケール化
+   */
+  private toGrayscale(imageData: ImageData): number[] {
+    const gray: number[] = [];
+    const pixels = imageData.data;
+    
+    for (let i = 0; i < pixels.length; i += 4) {
+      const r = pixels[i];
+      const g = pixels[i + 1];
+      const b = pixels[i + 2];
+      
+      // 輝度計算
+      const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+      gray.push(luminance);
+    }
+    
+    return gray;
+  }
+  
+  /**
+   * 平均値計算
+   */
+  private calculateAverage(values: number[]): number {
+    const sum = values.reduce((a, b) => a + b, 0);
+    return sum / values.length;
+  }
+  
+  /**
+   * 信頼度計算
+   */
+  private calculateConfidence(panels: DetectedPanel[]): number {
+    if (panels.length === 0) return 0;
+    
+    const avgConfidence = panels.reduce((sum, p) => sum + p.confidence, 0) / panels.length;
+    
+    // 期待されるパネル数と比較
+    const expectedCount = this.gridSize.rows * this.gridSize.cols;
+    const completeness = panels.length / expectedCount;
+    
+    return avgConfidence * completeness;
+  }
+}
+
+// 型定義
+interface CellData {
+  row: number;
+  col: number;
+  imageData: ImageData;
+}
+
+interface RGB {
+  r: number;
+  g: number;
+  b: number;
+}
+
+interface HSV {
+  h: number;  // 0-360
+  s: number;  // 0-1
+  v: number;  // 0-1
+}
+```
+
+#### UIコンポーネント実装
+
+**ImageRecognitionPanel.tsx**
+```typescript
+export const ImageRecognitionPanel: React.FC<ImageRecognitionPanelProps> = ({
+  difficulty,
+  onRecognitionComplete
+}) => {
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [result, setResult] = useState<RecognitionResult | null>(null);
+  const [cameraActive, setCameraActive] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  
+  // カメラを起動
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'environment',  // 背面カメラ
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
+      });
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        streamRef.current = stream;
+        setCameraActive(true);
+      }
+    } catch (err) {
+      console.error('カメラアクセスエラー:', err);
+      alert('カメラへのアクセスに失敗しました。\nブラウザの設定でカメラの許可を確認してください。');
+    }
+  };
+  
+  // カメラを停止
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+      setCameraActive(false);
+    }
+  };
+  
+  // カメラ映像をキャプチャして認識
+  const captureAndRecognize = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    
+    setIsProcessing(true);
+    
+    // キャンバスに描画
+    const canvas = canvasRef.current;
+    const video = videoRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    const context = canvas.getContext('2d')!;
+    context.drawImage(video, 0, 0);
+    
+    // Blob化
+    const blob = await new Promise<Blob>((resolve) => {
+      canvas.toBlob((b) => resolve(b!), 'image/png');
+    });
+    
+    // 認識実行
+    await recognizeImage(new File([blob], 'capture.png', { type: 'image/png' }));
+    
+    // カメラを停止
+    stopCamera();
+  };
+  
+  // ファイルアップロードから認識
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    await recognizeImage(file);
+  };
+  
+  // 画像認識処理
+  const recognizeImage = async (file: File) => {
+    setIsProcessing(true);
+    
+    try {
+      const recognizer = new PanelRecognizer(difficulty);
+      const result = await recognizer.recognizeFromImage(file);
+      
+      setResult(result);
+      
+      if (result.success && result.confidence > 0.7) {
+        // 認識結果を盤面に適用
+        onRecognitionComplete(result.panels);
+        alert(`盤面を読み取りました！\n信頼度: ${(result.confidence * 100).toFixed(1)}%`);
+      } else if (result.success) {
+        // 信頼度が低い場合は確認
+        const confirmed = confirm(
+          `認識精度が低い可能性があります（${(result.confidence * 100).toFixed(1)}%）\n` +
+          `それでも適用しますか？`
+        );
+        if (confirmed) {
+          onRecognitionComplete(result.panels);
+        }
+      } else {
+        alert('画像の認識に失敗しました。\n別の画像を試してください。');
+      }
+      
+    } catch (error) {
+      console.error('認識エラー:', error);
+      alert('エラーが発生しました。');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+  
+  // クリーンアップ
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, []);
+  
+  return (
+    <div className="mb-4 p-4 border-2 border-purple-200 rounded-lg bg-gradient-to-br from-purple-50 to-pink-50">
+      <h3 className="font-bold mb-3 text-purple-800 flex items-center gap-2">
+        <span className="text-2xl">📸</span>
+        画像から盤面を読み取り
+      </h3>
+      
+      {/* カメラプレビュー */}
+      {cameraActive && (
+        <div className="mb-4">
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            className="w-full max-w-md mx-auto rounded-lg shadow-lg"
+          />
+          <canvas ref={canvasRef} className="hidden" />
+        </div>
+      )}
+      
+      {/* ボタン群 */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {!cameraActive ? (
+          <>
+            <button
+              onClick={startCamera}
+              disabled={isProcessing}
+              className="flex-1 min-w-[140px] px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+            >
+              📷 カメラで撮影
+            </button>
+            
+            <label className="flex-1 min-w-[140px] px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 cursor-pointer text-center font-medium">
+              🖼️ 画像を選択
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileUpload}
+                disabled={isProcessing}
+                className="hidden"
+              />
+            </label>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={captureAndRecognize}
+              disabled={isProcessing}
+              className="flex-1 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 font-medium"
+            >
+              ✨ 撮影して認識
+            </button>
+            
+            <button
+              onClick={stopCamera}
+              disabled={isProcessing}
+              className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50"
+            >
+              キャンセル
+            </button>
+          </>
+        )}
+      </div>
+      
+      {/* 処理中インジケーター */}
+      {isProcessing && (
+        <div className="flex items-center justify-center gap-3 p-4 bg-blue-50 rounded-lg">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+          <span className="text-blue-700 font-medium">画像を解析中...</span>
+        </div>
+      )}
+      
+      {/* 認識結果表示 */}
+      {result && !isProcessing && (
+        <div className={`p-3 rounded-lg ${
+          result.success 
+            ? 'bg-green-50 border border-green-200' 
+            : 'bg-red-50 border border-red-200'
+        }`}>
+          <p className={`font-medium ${
+            result.success ? 'text-green-800' : 'text-red-800'
+          }`}>
+            {result.success 
+              ? `✅ 認識成功 (信頼度: ${(result.confidence * 100).toFixed(1)}%)`
+              : '❌ 認識失敗'
+            }
+          </p>
+          <p className="text-sm text-gray-600 mt-1">
+            処理時間: {result.processingTime.toFixed(0)}ms
+          </p>
+          {result.errors && result.errors.length > 0 && (
+            <p className="text-sm text-red-600 mt-1">
+              エラー: {result.errors.join(', ')}
+            </p>
+          )}
+        </div>
+      )}
+      
+      {/* 使い方ヒント */}
+      <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <p className="text-sm text-yellow-800">
+          <strong>💡 ヒント:</strong>
+        </p>
+        <ul className="text-xs text-yellow-700 mt-1 list-disc list-inside space-y-1">
+          <li>盤面全体が写るように撮影してください</li>
+          <li>明るい場所で撮影すると精度が上がります</li>
+          <li>パネルがはっきり見えるようにピントを合わせてください</li>
+        </ul>
+      </div>
+    </div>
+  );
+};
+```
+
+### 19.3 更新されたファイル構造
+
+```
+panera/
+├── src/
+│   ├── components/
+│   │   ├── ImageRecognitionPanel.tsx    // NEW: 画像認識UI
+│   │   └── ...
+│   ├── hooks/
+│   │   └── useTouchDrag.ts               // NEW: タッチドラッグ
+│   ├── utils/
+│   │   ├── PanelRecognizer.ts            // NEW: 画像認識エンジン
+│   │   └── ...
+├── .test_images/                         // NEW: テスト画像
+│   ├── easy/
+│   ├── medium/
+│   ├── hard/
+│   └── expert/
+```
+
+### 19.4 実装フェーズの更新
+
+**Phase 2: エディット機能（4-5時間）** ← 時間増加
+```
+□ パレット選択ロジック
+□ 盤面への配置ロジック
+□ タッチドラッグ機能の実装       // NEW
+□ 画像認識エンジンの実装         // NEW
+□ 画像認識UIコンポーネント       // NEW
+□ 編集モードと入れ替えモードの切り替え
+□ 初期盤面の保存と復元
+□ localStorage連携
+```
+
+**総推定時間: 12-16時間**（画像認識機能追加により2-3時間増加）
+
+### 19.5 必要なnpmパッケージ
+
+```json
+{
+  "dependencies": {
+    "react": "^18.2.0",
+    "typescript": "^5.0.0",
+    // 画像認識は標準Canvas APIを使用するため追加ライブラリ不要
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0"
+  }
+}
+```
+
+**Note**: 画像認識はブラウザ標準のCanvas APIのみを使用して実装するため、外部ライブラリは不要です。これによりバンドルサイズを最小限に抑えられます。
+
+---
+
+## 20. ライセンス
 
 ### 18.1 使用ライブラリのライセンス確認
 ```
