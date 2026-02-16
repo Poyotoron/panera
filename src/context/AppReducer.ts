@@ -1,11 +1,63 @@
 import type { Action, AppState } from "../types";
 import {
   cloneBoard,
+  countPanelLabels,
   createEmptyBoard,
   applyDetectedPanels,
   placePanelOnBoard,
   swapPanels,
 } from "../utils/boardOperations";
+import { PRIZE_LABELS } from "../data/difficultyConfig";
+
+function getRequiredCount(label: string, prizes: string[]): number {
+  if (prizes.includes(label)) return 2;
+  if (label === "+" || label === "-") return 1;
+  return 0;
+}
+
+function shouldAutoTransition(
+  label: string,
+  prevCounts: Record<string, number>,
+  newCounts: Record<string, number>,
+  difficulty: AppState["difficulty"],
+): boolean {
+  const prizes = PRIZE_LABELS[difficulty];
+  const required = getRequiredCount(label, prizes);
+  if (required === 0) return false;
+  const prev = prevCounts[label] ?? 0;
+  const next = newCounts[label] ?? 0;
+  return prev < required && next >= required;
+}
+
+function getNextPanelLabel(
+  currentLabel: string,
+  counts: Record<string, number>,
+  difficulty: AppState["difficulty"],
+): string | null {
+  const prizes = PRIZE_LABELS[difficulty];
+
+  if (prizes.includes(currentLabel)) {
+    const startIndex = prizes.indexOf(currentLabel) + 1;
+    for (let i = startIndex; i < prizes.length; i += 1) {
+      const prize = prizes[i];
+      if ((counts[prize] ?? 0) < 2) return prize;
+    }
+    if ((counts["+"] ?? 0) < 1) return "+";
+    if ((counts["-"] ?? 0) < 1) return "-";
+    return null;
+  }
+
+  if (currentLabel === "+" || currentLabel === "-") {
+    for (const prize of prizes) {
+      if ((counts[prize] ?? 0) < 2) return prize;
+    }
+    const otherSpecial = currentLabel === "+" ? "-" : "+";
+    if ((counts[otherSpecial] ?? 0) < 1) return otherSpecial;
+    return null;
+  }
+
+  return null;
+}
 
 export const initialState: AppState = {
   difficulty: "easy",
@@ -15,6 +67,7 @@ export const initialState: AppState = {
   editMode: true,
   selectedPalettePanel: null,
   initialBoard: null,
+  panelCounts: {},
 };
 
 export function appReducer(state: AppState, action: Action): AppState {
@@ -24,6 +77,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         ...initialState,
         difficulty: action.payload,
         board: createEmptyBoard(action.payload),
+        panelCounts: {},
       };
 
     case "SELECT_PALETTE_PANEL":
@@ -35,14 +89,36 @@ export function appReducer(state: AppState, action: Action): AppState {
     case "PLACE_PANEL": {
       if (state.selectedPalettePanel === null) return state;
       const { row, col } = action.payload;
+      const newBoard = placePanelOnBoard(
+        state.board,
+        row,
+        col,
+        state.selectedPalettePanel,
+      );
+      const newCounts = countPanelLabels(newBoard);
+      let nextSelected = state.selectedPalettePanel;
+
+      if (
+        state.selectedPalettePanel !== "" &&
+        shouldAutoTransition(
+          state.selectedPalettePanel,
+          state.panelCounts,
+          newCounts,
+          state.difficulty,
+        )
+      ) {
+        nextSelected = getNextPanelLabel(
+          state.selectedPalettePanel,
+          newCounts,
+          state.difficulty,
+        );
+      }
+
       return {
         ...state,
-        board: placePanelOnBoard(
-          state.board,
-          row,
-          col,
-          state.selectedPalettePanel,
-        ),
+        board: newBoard,
+        panelCounts: newCounts,
+        selectedPalettePanel: nextSelected,
       };
     }
 
@@ -54,12 +130,15 @@ export function appReducer(state: AppState, action: Action): AppState {
         selectedPalettePanel: null,
         selectedPanel: null,
         history: [],
+        panelCounts: countPanelLabels(state.board),
       };
 
     case "CLEAR_BOARD":
       return {
         ...state,
         board: createEmptyBoard(state.difficulty),
+        panelCounts: {},
+        selectedPalettePanel: PRIZE_LABELS[state.difficulty][0] ?? null,
       };
 
     case "RE_EDIT":
@@ -76,6 +155,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         board: action.payload,
         initialBoard: cloneBoard(action.payload),
         editMode: false,
+        panelCounts: countPanelLabels(action.payload),
       };
 
     case "APPLY_RECOGNITION": {
@@ -87,6 +167,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         selectedPalettePanel: null,
         selectedPanel: null,
         history: [],
+        panelCounts: countPanelLabels(newBoard),
       };
     }
 
@@ -139,6 +220,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         board: cloneBoard(state.initialBoard),
         selectedPanel: null,
         history: [],
+        panelCounts: countPanelLabels(state.initialBoard),
       };
     }
 

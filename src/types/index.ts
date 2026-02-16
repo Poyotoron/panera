@@ -26,6 +26,7 @@ export interface AppState {
   editMode: boolean;
   selectedPalettePanel: string | null;
   initialBoard: Panel[][] | null;
+  panelCounts: Record<string, number>;
 }
 
 export interface DetectedPanel {
