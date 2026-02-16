@@ -37,9 +37,7 @@ export function PanelPalette() {
                 ? "bg-blue-600 text-white ring-4 ring-blue-300 scale-105"
                 : "bg-blue-500 text-white hover:bg-blue-600"
             } ${
-              getCount(label) >= getRequiredCount(label)
-                ? "opacity-60"
-                : ""
+              getCount(label) >= getRequiredCount(label) ? "opacity-60" : ""
             }`}
           >
             {label}
@@ -94,7 +92,9 @@ export function PanelPalette() {
         <p className="mt-2 text-sm text-gray-600">
           選択中:{" "}
           <span className="font-bold text-indigo-600">
-            {state.selectedPalettePanel === "" ? "消去" : state.selectedPalettePanel}
+            {state.selectedPalettePanel === ""
+              ? "消去"
+              : state.selectedPalettePanel}
           </span>
         </p>
       )}
