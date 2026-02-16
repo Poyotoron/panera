@@ -62,6 +62,17 @@ export function cloneBoard(board: Panel[][]): Panel[][] {
   return board.map((row) => row.map((panel) => ({ ...panel })));
 }
 
+export function countPanelLabels(board: Panel[][]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const row of board) {
+    for (const panel of row) {
+      if (!panel.label) continue;
+      counts[panel.label] = (counts[panel.label] ?? 0) + 1;
+    }
+  }
+  return counts;
+}
+
 export function placePanelOnBoard(
   board: Panel[][],
   row: number,
