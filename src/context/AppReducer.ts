@@ -87,28 +87,29 @@ export function appReducer(state: AppState, action: Action): AppState {
       };
 
     case "PLACE_PANEL": {
-      if (state.selectedPalettePanel === null) return state;
+      const selectedLabel = state.selectedPalettePanel;
+      if (selectedLabel === null) return state;
       const { row, col } = action.payload;
       const newBoard = placePanelOnBoard(
         state.board,
         row,
         col,
-        state.selectedPalettePanel,
+        selectedLabel,
       );
       const newCounts = countPanelLabels(newBoard);
-      let nextSelected = state.selectedPalettePanel;
+      let nextSelected = selectedLabel;
 
       if (
-        state.selectedPalettePanel !== "" &&
+        selectedLabel !== "" &&
         shouldAutoTransition(
-          state.selectedPalettePanel,
+          selectedLabel,
           state.panelCounts,
           newCounts,
           state.difficulty,
         )
       ) {
         nextSelected = getNextPanelLabel(
-          state.selectedPalettePanel,
+          selectedLabel,
           newCounts,
           state.difficulty,
         );
