@@ -97,7 +97,7 @@ export function appReducer(state: AppState, action: Action): AppState {
         selectedLabel,
       );
       const newCounts = countPanelLabels(newBoard);
-      let nextSelected = selectedLabel;
+      let nextSelected: string | null = selectedLabel;
 
       if (
         selectedLabel !== "" &&
